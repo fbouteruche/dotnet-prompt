@@ -79,28 +79,32 @@ Use **System.CommandLine** for robust CLI functionality:
 
 ### 4.2 Application Layer (DotnetPrompt.Application)
 
-Implements use cases leveraging **Semantic Kernel** for AI orchestration:
+Implements use cases leveraging **Semantic Kernel** for AI orchestration and all cross-cutting concerns:
 
 ```csharp
 // Use Cases (MediatR Handlers)
-- ExecuteWorkflowHandler (uses Semantic Kernel)
-- RestoreDependenciesHandler
-- ValidateWorkflowHandler
-- ResumeWorkflowHandler
-- ListWorkflowsHandler
+- ExecuteWorkflowHandler (uses SK function calling & planning)
+- RestoreDependenciesHandler (uses SK tool orchestration)
+- ValidateWorkflowHandler (uses SK prompt templates)
+- ResumeWorkflowHandler (uses SK conversation state & chat history)
+- ListWorkflowsHandler (uses SK vector search for discovery)
 
-// Services
-- IWorkflowOrchestrator (wraps Semantic Kernel)
-- IProgressManager (integrates with SK conversation state)
-- IConfigurationResolver
-- IKernelFactory (configures Semantic Kernel with providers and tools)
+// Services (All SK-powered)
+- IWorkflowOrchestrator (wraps SK Kernel with automatic function calling)
+- IProgressManager (uses SK ChatHistory and conversation state persistence)
+- IConfigurationResolver (uses SK dependency injection patterns)
+- IKernelFactory (configures SK with providers, tools, filters, and middleware)
+- IConversationStateManager (uses SK ChatHistory and memory persistence)
+- IPromptTemplateManager (uses SK prompt template engine)
 ```
 
 **Key Responsibilities:**
-- Workflow execution orchestration
-- Sub-workflow composition
-- Progress tracking and resume logic
-- Configuration hierarchy resolution
+- Workflow execution orchestration via SK function calling
+- Sub-workflow composition via SK automatic planning
+- Progress tracking and resume via SK conversation state management
+- Configuration hierarchy via SK dependency injection patterns
+- Error handling and retry via SK filters and middleware
+- Observability and telemetry via SK built-in instrumentation
 
 ### 4.3 Domain Layer (DotnetPrompt.Core)
 
@@ -128,96 +132,256 @@ Pure business logic with no external dependencies:
 
 ### 4.4 Infrastructure Layer (DotnetPrompt.Infrastructure)
 
-External integrations and persistence:
+External integrations and persistence, fully leveraging SK capabilities:
 
 ```csharp
-// AI Provider Integration (using Microsoft.Extensions.AI)
-- IChatClient (unified interface for all providers)
-- GitHubModelsChatClient
-- OpenAIChatClient  
-- AzureOpenAIChatClient
-- AnthropicChatClient
-- OllamaChatClient
+// AI Provider Integration (using Microsoft.Extensions.AI + SK)
+- IChatClient (unified interface via Microsoft.Extensions.AI)
+- Semantic Kernel service registration and configuration
+- SK filters for retry policies, rate limiting, and circuit breakers
+- SK middleware for logging, telemetry, and authentication
 
-// Semantic Kernel Integration
-- KernelBuilder and Kernel configuration
-- Built-in tool plugins for Semantic Kernel
-- Conversation state management
-- Prompt template management
+// Semantic Kernel Integration (Comprehensive)
+- KernelBuilder with full dependency injection setup
+- Built-in tool plugins with SK function annotations
+- SK ChatHistory persistence for conversation state
+- SK prompt template engine for dynamic prompt management
+- SK vector store connectors for memory and caching
+- SK filters for function calling, prompt execution, and chat completion
+- SK middleware for observability, security, and performance monitoring
 
-// Built-in Tools (as Semantic Kernel Plugins)
-- ProjectAnalysisPlugin
-- BuildTestPlugin
-- FileSystemPlugin
+// Built-in Tools (as SK Plugins with full SK capabilities)
+- ProjectAnalysisPlugin (SK function with parameter validation)
+- BuildTestPlugin (SK function with retry policies)
+- FileSystemPlugin (SK function with security filters)
+- WorkflowDiscoveryPlugin (SK function with vector search)
 
-// MCP Integration (using C# MCP SDK)
-- McpClientFactory
-- McpToolRegistry
-- McpServerConnectionManager
+// Memory & Caching (SK Vector Store Connectors)
+- IVectorStore for workflow and conversation caching
+- Vector search for intelligent workflow discovery
+- Embedding generation for semantic search capabilities
+- Memory persistence for long-running workflow state
 
-// External Services
-- GitHubCliAuthenticator
-- ConfigurationPersistence
+// MCP Integration (via SK Plugin Architecture)
+- McpServerPlugin (SK plugin wrapper for MCP servers)
+- Dynamic MCP tool registration as SK functions
+- SK parameter validation for MCP tool parameters
+- SK error handling and retry for MCP server communication
+
+// Cross-Cutting Concerns (SK Filters & Middleware)
+- PromptExecutionFilter for security and validation
+- FunctionInvocationFilter for performance monitoring
+- ChatCompletionFilter for content safety and compliance
+- Custom SK middleware for workflow-specific concerns
+
+// External Services (SK-enhanced)
+- GitHubCliAuthenticator (with SK secure credential management)
+- ConfigurationPersistence (using SK dependency injection patterns)
+- TelemetryService (leveraging SK built-in instrumentation)
 ```
 
-## 5. Key Architectural Patterns
+## 5. Key Architectural Patterns (SK-Maximized)
 
-### 5.1 Microsoft.Extensions.AI Integration
+### 5.1 Microsoft.Extensions.AI + SK Integration
 
 ```csharp
-// Unified AI provider configuration using Microsoft.Extensions.AI
-services.AddChatClient(builder =>
+// Unified AI provider configuration with SK dependency injection
+var builder = Kernel.CreateBuilder();
+
+// Add AI services via Microsoft.Extensions.AI
+builder.Services.AddChatClient(chatBuilder =>
 {
     var provider = configuration.GetProvider();
     return provider switch
     {
-        "github" => builder.UseGitHubModels(apiKey),
-        "openai" => builder.UseOpenAI(apiKey),
-        "azure" => builder.UseAzureOpenAI(endpoint, apiKey),
-        "anthropic" => builder.UseAnthropic(apiKey),
-        "local" => builder.UseOllama(endpoint),
+        "github" => chatBuilder.UseGitHubModels(apiKey),
+        "openai" => chatBuilder.UseOpenAI(apiKey),
+        "azure" => chatBuilder.UseAzureOpenAI(endpoint, apiKey),
+        "anthropic" => chatBuilder.UseAnthropic(apiKey),
+        "local" => chatBuilder.UseOllama(endpoint),
         _ => throw new ArgumentException($"Unknown provider: {provider}")
     };
 })
-.UseRetry(retryOptions)
-.UseLogging()
-.UseTelemetry();
+.UseRetry() // SK-compatible retry middleware
+.UseLogging() // SK-compatible logging middleware
+.UseTelemetry(); // SK-compatible telemetry middleware
+
+// Register all workflow components as SK services
+builder.Services.AddSingleton<IWorkflowOrchestrator, SkWorkflowOrchestrator>();
+builder.Services.AddSingleton<IProgressManager, SkProgressManager>();
+builder.Services.AddSingleton<IConversationStateManager, SkConversationStateManager>();
+
+// Add SK Vector Store for memory and caching
+builder.Services.AddSingleton<IVectorStore>(provider => 
+    new InMemoryVectorStore()); // or Qdrant, Azure AI Search, etc.
+
+var kernel = builder.Build();
 ```
 
-### 5.2 Semantic Kernel Tool Integration
+### 5.2 SK Function Calling for All Tool Operations
 
 ```csharp
-// Built-in tools as Semantic Kernel plugins
-[KernelFunction]
-public async Task<string> AnalyzeProject(
-    [Description("The project file path")] string projectPath)
+// Built-in tools as SK functions with comprehensive annotations
+[KernelFunction("analyze_project")]
+[Description("Analyzes a .NET project and returns comprehensive information about its structure, dependencies, and configuration")]
+[return: Description("JSON object containing project analysis results")]
+public async Task<ProjectAnalysisResult> AnalyzeProjectAsync(
+    [Description("The absolute path to the project file (.csproj/.fsproj/.vbproj)")] 
+    string projectPath,
+    [Description("Include dependency analysis (default: true)")] 
+    bool includeDependencies = true,
+    KernelArguments? arguments = null,
+    CancellationToken cancellationToken = default)
 {
-    // Tool implementation
+    // SK automatically handles parameter validation, type conversion, and error handling
+    // Implementation delegates to domain services
 }
 
-// MCP tools dynamically registered
-kernel.Plugins.AddFromMcpServer("filesystem-mcp", mcpClient);
+// Automatic function calling for workflow execution
+var executionSettings = new OpenAIPromptExecutionSettings
+{
+    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(), // SK planning
+    Temperature = config.Temperature,
+    MaxTokens = config.MaxTokens
+};
+
+// SK handles the entire planning loop automatically
+var result = await kernel.InvokeAsync("workflow_executor", 
+    new KernelArguments
+    {
+        ["workflow_content"] = workflowMarkdown,
+        ["execution_context"] = executionContext
+    }, 
+    executionSettings);
 ```
 
-### 5.3 Factory Pattern for Kernel Configuration
+### 5.3 SK ChatHistory for State Management
 
 ```csharp
-public interface IKernelFactory
+// SK conversation state management with persistence
+public class SkConversationStateManager : IConversationStateManager
 {
-    Task<Kernel> CreateKernelAsync(WorkflowConfiguration config);
-    Task RegisterToolsAsync(Kernel kernel, IEnumerable<string> requiredTools);
-    Task RegisterMcpServersAsync(Kernel kernel, IEnumerable<McpServerConfig> mcpServers);
+    private readonly IVectorStore _vectorStore;
+    
+    public async Task<ChatHistory> LoadConversationStateAsync(string workflowId)
+    {
+        // Use SK Vector Store for conversation persistence
+        var collection = _vectorStore.GetCollection<string, ConversationRecord>("conversations");
+        var conversation = await collection.GetAsync(workflowId);
+        
+        if (conversation?.ChatHistoryJson != null)
+        {
+            return JsonSerializer.Deserialize<ChatHistory>(conversation.ChatHistoryJson);
+        }
+        
+        return new ChatHistory();
+    }
+    
+    public async Task SaveConversationStateAsync(string workflowId, ChatHistory chatHistory)
+    {
+        // Persist using SK Vector Store with automatic embedding generation
+        var collection = _vectorStore.GetCollection<string, ConversationRecord>("conversations");
+        await collection.UpsertAsync(new ConversationRecord
+        {
+            Id = workflowId,
+            ChatHistoryJson = JsonSerializer.Serialize(chatHistory),
+            LastModified = DateTimeOffset.UtcNow
+        });
+    }
 }
 ```
 
-### 5.4 Observer Pattern for Progress Tracking
+### 5.4 SK Filters for Cross-Cutting Concerns
 
 ```csharp
-public interface IProgressObserver
+// SK filters for comprehensive error handling and observability
+public class WorkflowExecutionFilter : IPromptRenderFilter, IFunctionInvocationFilter
 {
-    Task OnProgressUpdated(WorkflowExecution execution);
-    Task OnToolExecuted(string toolName, object result);
-    Task OnConversationStateChanged(ConversationState state);
+    public async Task OnPromptRenderAsync(PromptRenderContext context, Func<PromptRenderContext, Task> next)
+    {
+        // Pre-execution: Validate workflow syntax, check permissions
+        await ValidateWorkflowSyntax(context);
+        
+        try
+        {
+            await next(context);
+        }
+        catch (Exception ex)
+        {
+            // SK filter handles all workflow execution errors consistently
+            await LogWorkflowError(context, ex);
+            throw;
+        }
+    }
+    
+    public async Task OnFunctionInvocationAsync(FunctionInvocationContext context, Func<FunctionInvocationContext, Task> next)
+    {
+        // Pre-execution: Parameter validation, security checks
+        var stopwatch = Stopwatch.StartNew();
+        
+        try
+        {
+            await next(context);
+            
+            // Post-execution: Performance monitoring, result validation
+            await LogFunctionPerformance(context.Function.Name, stopwatch.Elapsed);
+        }
+        catch (Exception ex)
+        {
+            await LogFunctionError(context, ex);
+            throw;
+        }
+    }
+}
+
+// Register SK filters in kernel configuration
+builder.Services.AddSingleton<IPromptRenderFilter, WorkflowExecutionFilter>();
+builder.Services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
+```
+
+### 5.5 SK Vector Store for Intelligent Caching
+
+```csharp
+// Intelligent workflow caching using SK Vector Store
+public class SkWorkflowCacheManager
+{
+    private readonly IVectorStore _vectorStore;
+    private readonly ITextEmbeddingGenerationService _embeddingService;
+    
+    public async Task<WorkflowResult?> GetCachedResultAsync(string workflowContent, WorkflowContext context)
+    {
+        // Generate embedding for semantic similarity search
+        var contentEmbedding = await _embeddingService.GenerateEmbeddingAsync(workflowContent);
+        
+        // Use SK vector search for intelligent cache lookup
+        var collection = _vectorStore.GetCollection<string, CachedWorkflowResult>("workflow_cache");
+        var searchResults = await collection.SearchAsync(contentEmbedding, new VectorSearchOptions { Top = 1, MinScore = 0.95 });
+        
+        var cachedResult = searchResults.FirstOrDefault();
+        if (cachedResult != null && IsContextCompatible(cachedResult.Record.Context, context))
+        {
+            return cachedResult.Record.Result;
+        }
+        
+        return null;
+    }
+    
+    public async Task CacheWorkflowResultAsync(string workflowContent, WorkflowContext context, WorkflowResult result)
+    {
+        // Cache with semantic embedding for intelligent retrieval
+        var contentEmbedding = await _embeddingService.GenerateEmbeddingAsync(workflowContent);
+        
+        var collection = _vectorStore.GetCollection<string, CachedWorkflowResult>("workflow_cache");
+        await collection.UpsertAsync(new CachedWorkflowResult
+        {
+            Id = GenerateCacheKey(workflowContent, context),
+            WorkflowContent = workflowContent,
+            ContentEmbedding = contentEmbedding,
+            Context = context,
+            Result = result,
+            CachedAt = DateTimeOffset.UtcNow
+        });
+    }
 }
 ```
 
@@ -230,12 +394,16 @@ public interface IProgressObserver
 - **System.CommandLine** for CLI parsing
 - **Microsoft.Extensions.DependencyInjection** for IoC
 
-### 6.2 Microsoft AI Ecosystem Libraries
+### 6.2 Microsoft AI Ecosystem Libraries (Comprehensive SK Integration)
 
-- **Microsoft.Extensions.AI** - Unified AI provider abstraction with built-in middleware
-- **Microsoft.SemanticKernel** - AI orchestration, tool calling, and conversation management
-- **Microsoft.Extensions.AI.Abstractions** - Core IChatClient and IEmbeddingGenerator interfaces
-- **C# SDK for MCP** - Native Model Context Protocol support (when available)
+- **Microsoft.Extensions.AI** - Unified AI provider abstraction with SK-compatible middleware
+- **Microsoft.SemanticKernel** - Complete AI orchestration framework with function calling, planning, and state management
+- **Microsoft.SemanticKernel.Plugins.Core** - Built-in SK plugins for time, math, and text operations
+- **Microsoft.Extensions.VectorData.Abstractions** - SK Vector Store abstractions for memory and caching
+- **Microsoft.SemanticKernel.Connectors.Memory** - SK memory connectors for persistence
+- **Microsoft.SemanticKernel.PromptTemplates.Liquid** - Advanced prompt templating for workflows
+- **Microsoft.Extensions.AI.Abstractions** - Core interfaces for AI services
+- **C# SDK for MCP** - Native Model Context Protocol support integrated via SK plugins
 
 ### 6.3 Supporting Libraries
 
@@ -252,49 +420,63 @@ public interface IProgressObserver
 - **Moq** - Mocking framework
 - **TestContainers** - Integration testing
 
-## 7. Security and Error Handling
+## 7. Security and Error Handling (SK-Enhanced)
 
-### 7.1 Security Considerations
+### 7.1 Security Considerations (Leveraging SK Security Features)
 
-- **Configuration Encryption**: Encrypt sensitive data in config files using DPAPI
-- **Token Management**: Secure storage of API keys with appropriate file permissions
-- **Input Validation**: Robust validation of workflow files and user inputs
-- **Trust Boundaries**: Clear documentation of full-trust execution model
+- **SK Security Filters**: Use SK's built-in security filters for prompt injection detection and content safety
+- **Function Authorization**: SK function-level authorization attributes for tool access control
+- **Configuration Encryption**: Encrypt sensitive data using SK's secure credential management
+- **Token Management**: Secure API key storage via SK dependency injection with Azure Key Vault integration
+- **Input Validation**: SK automatic parameter validation with custom validation attributes
+- **Trust Boundaries**: SK function isolation and sandboxing for safe tool execution
+- **Prompt Safety**: SK built-in prompt execution filters for preventing malicious prompts
 
-### 7.2 Error Handling Strategy
+### 7.2 Error Handling Strategy (SK Filters & Middleware)
 
-- **Result Pattern**: Use Result<T> for operation outcomes
-- **Custom Exceptions**: Domain-specific exceptions with clear messages
-- **Retry Logic**: Exponential backoff for transient failures
-- **Circuit Breaker**: Protection against failing external services
+- **SK Exception Filters**: Comprehensive error handling via SK's IFunctionInvocationFilter
+- **Semantic Retry Policies**: SK-aware retry logic that understands AI service failures and token limits
+- **Circuit Breaker Pattern**: SK middleware for protecting against cascading failures
+- **Graceful Degradation**: SK function fallback mechanisms when services are unavailable
+- **Error Categorization**: SK-specific error types for AI service failures, function execution errors, and planning failures
+- **Observability Integration**: SK built-in telemetry for error tracking and performance monitoring
 
-## 8. Performance Considerations
+## 8. Performance Considerations (SK-Optimized)
 
-### 8.1 Startup Performance
+### 8.1 Startup Performance (SK Best Practices)
 
-- **Lazy Loading**: Initialize providers and tools on-demand
-- **Assembly Loading**: Minimal assembly loading at startup
-- **Configuration Caching**: Cache parsed configuration for subsequent runs
+- **Lazy Kernel Initialization**: Create SK kernels on-demand with cached configurations
+- **Plugin Registration Optimization**: Register only required SK plugins per workflow
+- **Service Provider Caching**: Cache SK service configurations for rapid kernel creation
+- **Vector Store Warm-up**: Pre-load frequently accessed embeddings and conversation state
+- **Function Compilation**: SK function compilation caching for repeated workflow executions
 
-### 8.2 Memory Management
+### 8.2 Runtime Performance (SK Features)
 
-- **Streaming**: Stream large file operations
-- **Disposal**: Proper IDisposable implementation for resources
-- **Weak References**: For large conversation histories
+- **SK Function Caching**: Leverage SK's built-in function result caching mechanisms
+- **Vector Store Optimization**: Use SK Vector Store connectors for intelligent caching and retrieval
+- **Conversation State Compression**: Efficient SK ChatHistory serialization and storage
+- **Parallel Function Execution**: SK support for parallel function calling when appropriate
+- **Token Management**: SK automatic token counting and optimization for model interactions
+- **Memory Efficiency**: SK streaming capabilities for large file operations and conversation histories
 
-## 9. Extensibility Points
+## 9. Extensibility Points (SK-Powered)
 
-### 9.1 Plugin Architecture
+### 9.1 Plugin Architecture (SK Native)
 
-- **Provider Plugins**: Custom AI provider implementations
-- **Tool Plugins**: Additional built-in tools via MEF composition
-- **Configuration Sources**: Custom configuration providers
+- **SK Function Plugins**: Additional built-in tools via SK's native plugin system
+- **Provider Extensions**: Custom AI provider implementations via Microsoft.Extensions.AI
+- **Vector Store Connectors**: Custom memory/caching implementations via SK Vector Store abstractions
+- **Filter Pipeline**: Custom SK filters for workflow-specific processing and validation
+- **Middleware Extensions**: Custom SK middleware for specialized cross-cutting concerns
 
-### 9.2 MCP Integration
+### 9.2 MCP Integration (SK Plugin Wrappers)
 
-- **Dynamic Loading**: Runtime discovery of MCP servers
-- **Version Compatibility**: Graceful handling of MCP version differences
-- **Tool Isolation**: Sandboxed execution of MCP tools
+- **Dynamic MCP Loading**: Runtime discovery of MCP servers via SK plugin factory
+- **SK Function Mapping**: Automatic conversion of MCP tools to SK functions with proper annotations
+- **Version Compatibility**: Graceful MCP version handling via SK function versioning
+- **Tool Isolation**: SK function sandboxing for safe MCP tool execution
+- **State Management**: MCP server state persistence via SK conversation and vector storage
 
 ## 10. Deployment and Distribution
 
@@ -382,25 +564,35 @@ public interface IProgressObserver
 - Configuration through .NET's Options pattern
 - Dependency injection integration
 
-### 13.2 Semantic Kernel Benefits
+### 13.2 Semantic Kernel Benefits (Comprehensive Utilization)
 
-**AI Orchestration**:
-- Native function calling support aligns perfectly with our tool system
-- Built-in conversation state management for resume functionality
-- Prompt template management enhances our markdown workflows
-- Plugin architecture simplifies tool integration
+**AI Orchestration & Planning**:
+- Native function calling with automatic planning eliminates custom orchestration code
+- Built-in conversation state management provides resume functionality out-of-the-box
+- Prompt template engine with Liquid syntax enhances markdown workflow processing
+- Automatic parallel function execution optimizes multi-tool workflows
+- Plugin architecture provides consistent tool integration across built-in and MCP tools
 
-**Tool Integration**:
-- Built-in tools become Semantic Kernel plugins with minimal code
-- MCP tools can be dynamically registered as SK functions
-- Automatic parameter validation and type conversion
-- Consistent tool calling interface across all tools
+**Memory & State Management**:
+- ChatHistory provides persistent conversation state with automatic serialization
+- Vector Store connectors enable intelligent caching and semantic search
+- Embedding generation services support workflow discovery and similarity matching
+- Conversation state persistence handles long-running workflow interruptions
+- Memory optimization with built-in compression and streaming capabilities
 
-**Conversation Management**:
-- Built-in conversation history and state management
-- Automatic prompt optimization and token management
-- Native support for multi-turn conversations
-- Progress tracking becomes simpler with SK's state management
+**Cross-Cutting Concerns**:
+- Filter pipeline provides consistent error handling, logging, and validation
+- Middleware system enables telemetry, performance monitoring, and security
+- Dependency injection integration follows .NET best practices
+- Built-in retry policies and circuit breakers for resilience
+- Automatic parameter validation and type conversion for all functions
+
+**Observability & Monitoring**:
+- Native telemetry integration with OpenTelemetry standards
+- Built-in performance counters for function execution and model interactions
+- Structured logging with correlation IDs for workflow tracing
+- Health checks for AI services and external dependencies
+- Real-time metrics for token usage, costs, and performance optimization
 
 ### 13.3 C# MCP SDK Benefits
 
@@ -416,52 +608,66 @@ public interface IProgressObserver
 - Automatic parameter marshaling
 - Error handling and fault tolerance
 
-### 13.4 Architecture Simplification
+### 13.4 Architecture Simplification (Maximum SK Leverage)
 
 **Before (Custom Implementation)**:
 - Custom AI provider abstractions (~500 lines)
 - Custom tool calling implementation (~800 lines)
 - Custom MCP protocol implementation (~1200 lines)
 - Custom conversation state management (~400 lines)
-- **Total**: ~2900 lines of infrastructure code
+- Custom error handling and retry logic (~600 lines)
+- Custom caching and memory management (~450 lines)
+- Custom observability and telemetry (~350 lines)
+- **Total**: ~4300 lines of infrastructure code
 
-**After (Microsoft AI Ecosystem)**:
-- Provider configuration (~50 lines)
-- Semantic Kernel setup (~100 lines)
-- MCP integration (~150 lines)
-- Progress tracking integration (~100 lines)
-- **Total**: ~400 lines of infrastructure code
+**After (Maximum SK Utilization)**:
+- AI provider configuration via Microsoft.Extensions.AI (~30 lines)
+- Semantic Kernel setup with full feature utilization (~80 lines)
+- MCP integration via SK plugin wrappers (~40 lines)
+- Progress tracking via SK ChatHistory (~20 lines)
+- Error handling via SK filters and middleware (~60 lines)
+- Caching via SK Vector Store connectors (~35 lines)
+- Observability via SK built-in telemetry (~15 lines)
+- Workflow orchestration via SK function calling (~50 lines)
+- **Total**: ~330 lines of infrastructure code
 
-**Code Reduction**: ~85% reduction in infrastructure code
-**Maintenance Burden**: Significant reduction as Microsoft maintains the core libraries
-**Reliability**: Battle-tested libraries used by enterprise applications
+**Code Reduction**: ~92% reduction in infrastructure code
+**Feature Enhancement**: Significantly more capabilities with less code
+**Maintenance Burden**: Minimal - Microsoft maintains all core functionality
+**Reliability**: Enterprise-grade reliability from battle-tested SK framework
+**Performance**: Optimized SK implementations outperform custom solutions
+**Extensibility**: Rich plugin ecosystem and standard patterns for customization
 
-## 14. Updated Implementation Roadmap
+## 14. Updated Implementation Roadmap (SK-Maximized)
 
-### Phase 1: Foundation (MVP) - Enhanced
-1. Microsoft.Extensions.AI provider configuration
+### Phase 1: Foundation (MVP) - SK-First Approach
+1. Microsoft.Extensions.AI provider configuration with SK integration
 2. Basic CLI structure with System.CommandLine
-3. Semantic Kernel integration and setup
-4. Workflow parsing (YAML frontmatter + Markdown)
+3. Full Semantic Kernel setup with dependency injection, filters, and middleware
+4. Workflow parsing with SK prompt template engine integration
+5. SK Vector Store setup for memory and conversation persistence
 
-### Phase 2: Core Functionality - Simplified
-1. Built-in tools as Semantic Kernel plugins
-2. Workflow execution via Semantic Kernel orchestration
-3. Progress tracking with SK conversation state
-4. Resume functionality leveraging SK state management
+### Phase 2: Core Functionality - SK-Powered
+1. Built-in tools as comprehensive SK plugins with proper annotations
+2. Workflow execution via SK automatic function calling and planning
+3. Progress tracking and state management via SK ChatHistory and Vector Store
+4. Resume functionality leveraging SK conversation state persistence
+5. Error handling and retry via SK filters and middleware pipeline
 
-### Phase 3: Extensibility - Streamlined
-1. Additional AI providers via Microsoft.Extensions.AI
-2. MCP server integration via C# MCP SDK
-3. Sub-workflow composition through SK planning
-4. Advanced middleware via Microsoft.Extensions.AI
+### Phase 3: Extensibility - SK Plugin Ecosystem
+1. Additional AI providers via Microsoft.Extensions.AI with SK middleware
+2. MCP server integration via SK plugin wrappers and function factories
+3. Sub-workflow composition through SK automatic planning and function orchestration
+4. Advanced caching and memory via SK Vector Store connectors
+5. Comprehensive observability via SK built-in telemetry and instrumentation
 
-### Phase 4: Polish & Optimization - Focused
-1. Performance tuning of SK configuration
-2. Comprehensive testing with AI ecosystem mocks
-3. Documentation and examples using standard patterns
-4. Community feedback integration
+### Phase 4: Polish & Optimization - SK Performance Tuning
+1. Performance optimization of SK kernel configuration and function execution
+2. Comprehensive testing with SK-aware mocks and test harnesses
+3. Documentation and examples using SK standard patterns and best practices
+4. Community feedback integration with SK plugin contribution guidelines
+5. Advanced SK features: custom filters, specialized vector stores, and enterprise integrations
 
 ---
 
-*The integration of Microsoft's AI ecosystem libraries significantly simplifies the architecture while providing enterprise-grade reliability, maintainability, and extensibility. This approach reduces development time, maintenance burden, and leverages battle-tested libraries used across the Microsoft ecosystem.*
+*This architecture maximizes Semantic Kernel's comprehensive capabilities, resulting in dramatically reduced code complexity, enhanced reliability, and enterprise-grade features. By leveraging SK's full ecosystem - from function calling and planning to vector stores and observability - we achieve a robust, maintainable, and highly capable system with minimal custom infrastructure code.*

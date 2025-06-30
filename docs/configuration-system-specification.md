@@ -19,19 +19,29 @@ The tool uses a hierarchical configuration system with the following precedence 
 
 ## Configuration Implementation
 
-### Configuration Resolution Logic
+### Configuration Resolution Logic (SK-Enhanced)
+
+**Semantic Kernel Integration:**
+The configuration system leverages SK's dependency injection patterns and service provider infrastructure for consistent configuration management across all components.
 
 **Primary Configuration Resolution:**
 ```csharp
 public class DotNetPromptConfiguration
 {
+    private readonly IKernelBuilder _kernelBuilder;
+    private readonly IVectorStore _vectorStore;
+    
     public static async Task<PromptConfiguration> ResolveConfigurationAsync(
+        IKernelBuilder kernelBuilder,         // SK kernel builder for DI integration
         string? cliProvider = null,           // 1. CLI --provider override
         string? frontmatterModel = null,      // 2. Workflow frontmatter model
         string? projectPath = null,           // 3. Project .dotnet-prompt/config.json
         CancellationToken cancellationToken = default)  // 4. Global ~/.dotnet-prompt/config.json
     {
         var config = new PromptConfiguration();
+        
+        // Configure SK services based on resolved configuration
+        await ConfigureSemanticKernelServices(kernelBuilder, config);
         
         // 4. Load global configuration first (lowest priority)
         var globalConfigPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 
@@ -41,6 +51,9 @@ public class DotNetPromptConfiguration
             var globalConfig = await JsonSerializer.DeserializeAsync<GlobalConfiguration>(
                 File.OpenRead(globalConfigPath), cancellationToken: cancellationToken);
             config.ApplyGlobalConfiguration(globalConfig);
+            
+            // Apply SK-specific global settings
+            await ApplySemanticKernelGlobalSettings(kernelBuilder, globalConfig);
         }
         
         // 3. Override with project configuration
@@ -48,6 +61,14 @@ public class DotNetPromptConfiguration
         {
             var projectConfigPath = Path.Combine(projectPath, ".dotnet-prompt", "config.json");
             if (File.Exists(projectConfigPath))
+            {
+                var projectConfig = await JsonSerializer.DeserializeAsync<ProjectConfiguration>(
+                    File.OpenRead(projectConfigPath), cancellationToken: cancellationToken);
+                config.ApplyProjectConfiguration(projectConfig);
+                
+                // Configure SK plugins and tools based on project settings
+                await ConfigureProjectSpecificTools(kernelBuilder, projectConfig);
+            }
             {
                 var projectConfig = await JsonSerializer.DeserializeAsync<ProjectConfiguration>(
                     File.OpenRead(projectConfigPath), cancellationToken: cancellationToken);

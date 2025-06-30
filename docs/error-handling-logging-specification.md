@@ -1,54 +1,94 @@
-# Error Handling and Logging Specification
+# Error Handling and Logging Specification (SK-Enhanced)
 
 ## Overview
 
-This document defines the comprehensive error handling strategy, logging levels, user feedback mechanisms, and diagnostic capabilities.
+This document defines the comprehensive error handling strategy, logging levels, user feedback mechanisms, and diagnostic capabilities leveraging Semantic Kernel's built-in filters, middleware, and observability features.
 
 ## Status
-🚧 **DRAFT** - Requires detailed specification
+✅ **COMPLETE** - SK-based error handling and observability patterns defined
 
-## Error Categories
+## Error Categories (SK-Aware)
 
-### System Errors
-- Configuration errors
-- File system errors
-- Network connectivity issues
-- Permission errors
+### System Errors (SK Service Level)
+- SK kernel initialization failures
+- AI service configuration errors
+- Vector store connectivity issues
+- SK plugin registration failures
+- Dependency injection container errors
 
-### Workflow Errors
-- Syntax errors in workflow files
-- Parameter validation errors
-- Sub-workflow invocation errors
-- Dependency resolution errors
+### Workflow Errors (SK Function Level)
+- SK function parameter validation errors
+- Workflow parsing errors (prompt template issues)
+- Sub-workflow composition failures
+- SK conversation state corruption
+- Function calling timeout errors
 
-### AI Provider Errors
-- Authentication failures
-- Rate limiting
+### AI Provider Errors (SK Provider Level)
+- Chat completion service failures
+- SK function calling errors
+- Token limit exceeded errors
+- SK prompt execution failures
 - Model availability issues
-- Response parsing errors
 
-### Tool Execution Errors
-- Built-in tool failures
-- MCP server communication errors
-- Tool parameter validation
-- Tool timeout errors
+### Tool Execution Errors (SK Plugin Level)
+- SK function execution failures
+- Plugin parameter conversion errors
+- MCP tool invocation errors (via SK plugin wrappers)
+- Tool timeout and cancellation errors
+- SK filter pipeline failures
 
-## Error Handling Strategies
+## Error Handling Strategies (SK-Implemented)
 
-### Retry Logic
+### SK Filter-Based Error Handling
+```csharp
+public class WorkflowErrorHandlingFilter : IFunctionInvocationFilter, IPromptRenderFilter
+{
+    private readonly ILogger<WorkflowErrorHandlingFilter> _logger;
+    private readonly IRetryPolicy _retryPolicy;
+    
+    public async Task OnFunctionInvocationAsync(FunctionInvocationContext context, 
+        Func<FunctionInvocationContext, Task> next)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            await _retryPolicy.ExecuteAsync(async () => await next(context));
+        }
+        catch (SKException ex) when (ex.ErrorCode == SKErrorCodes.FunctionExecutionFailed)
+        {
+            await HandleToolExecutionError(context, ex);
+            throw;
+        }
+        catch (HttpRequestException ex) when (IsTransientError(ex))
+        {
+            await HandleTransientNetworkError(context, ex);
+            throw;
+        }
+        finally
+        {
+            await LogPerformanceMetrics(context.Function.Name, stopwatch.Elapsed);
+        }
+    }
+}
+```
+
+### Retry Logic (SK-Integrated)
 ```yaml
 retry_policy:
+  # SK-aware retry configuration
   max_attempts: 3
   backoff_strategy: exponential
   base_delay: 1000ms
   max_delay: 30000ms
   retryable_errors:
-    - network_timeout
-    - rate_limit_exceeded
-    - temporary_ai_service_error
+    - sk_function_timeout
+    - ai_service_rate_limit
+    - vector_store_connectivity
+    - mcp_server_unavailable
+    - transient_network_error
 ```
 
-### Circuit Breaker Pattern
+### Circuit Breaker Pattern (SK Middleware)
 Protection against cascading failures in external dependencies.
 
 ### Fallback Mechanisms

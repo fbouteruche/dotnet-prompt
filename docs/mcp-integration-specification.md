@@ -1,53 +1,118 @@
-# MCP Integration Specification
+# MCP Integration Specification (SK Plugin Wrappers)
 
 ## Overview
 
-This document defines the Model Context Protocol (MCP) integration, including tool discovery, parameter mapping, error handling, and server management.
+This document defines the Model Context Protocol (MCP) integration through Semantic Kernel plugin wrappers, including tool discovery, SK function mapping, parameter validation, and server management.
 
 ## Status
-🚧 **DRAFT** - Requires detailed specification
+✅ **COMPLETE** - SK-based MCP integration patterns defined
 
-## MCP Server Configuration
+## MCP-to-SK Plugin Architecture
 
-### Dependency Declaration in Workflows
-```yaml
----
-mcp:
-  - server: "filesystem-mcp"
-    version: "1.0.0"
-    config:
-      root_path: "./project"
-  - server: "git-mcp"
-    version: "2.1.0"
-    config:
-      repository: "."
----
-```
+### Core Integration Strategy
+- **SK Plugin Wrappers**: MCP servers are wrapped as SK plugins for seamless integration
+- **Function Mapping**: MCP tools become SK functions with proper annotations and metadata
+- **Parameter Translation**: Automatic conversion between MCP schemas and SK function parameters
+- **Error Handling**: SK filters handle MCP communication errors and retries
+- **State Management**: SK conversation state includes MCP server connection status
 
-### MCP Configuration File (`.dotnet-prompt/mcp.json`)
+### MCP Server Configuration (SK-Enhanced)
+
+#### Enhanced MCP Configuration with SK Integration
 ```json
 {
-  "servers": {
+  "mcp_servers": {
     "filesystem-mcp": {
       "command": "npm",
       "args": ["run", "start"],
       "cwd": "./mcp-servers/filesystem",
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "sk_plugin_config": {
+        "plugin_name": "FileSystemMCP",
+        "description": "File system operations via MCP server",
+        "function_prefix": "fs_",
+        "parameter_validation": true,
+        "retry_policy": {
+          "max_attempts": 3,
+          "backoff_ms": [1000, 2000, 4000]
+        }
+      }
     },
     "git-mcp": {
-      "command": "python",
+      "command": "python", 
       "args": ["-m", "git_mcp"],
-      "version": "2.1.0"
+      "version": "2.1.0",
+      "sk_plugin_config": {
+        "plugin_name": "GitMCP",
+        "description": "Git operations via MCP server",
+        "function_prefix": "git_",
+        "security_filters": ["git_operation_validator"],
+        "performance_monitoring": true
+      }
     }
   },
-  "global_config": {
-    "timeout": 30,
-    "max_retries": 3
+  "sk_integration": {
+    "auto_discovery": true,
+    "function_naming_convention": "snake_case",
+    "error_handling_strategy": "sk_filters",
+    "telemetry_enabled": true,
+    "vector_store_caching": true
   }
 }
 ```
 
-## Tool Discovery and Registration
+## MCP-to-SK Function Registration
+
+### Dynamic Plugin Creation
+```csharp
+public class McpPluginFactory
+{
+    private readonly IMcpClientFactory _mcpClientFactory;
+    private readonly ILogger<McpPluginFactory> _logger;
+    
+    public async Task<KernelPlugin> CreateMcpPluginAsync(McpServerConfig serverConfig)
+    {
+        var mcpClient = await _mcpClientFactory.CreateClientAsync(serverConfig);
+        var mcpTools = await mcpClient.ListToolsAsync();
+        
+        var functions = new List<KernelFunction>();
+        
+        foreach (var mcpTool in mcpTools)
+        {
+            var skFunction = CreateSkFunctionFromMcpTool(mcpTool, mcpClient, serverConfig);
+            functions.Add(skFunction);
+        }
+        
+        return KernelPluginFactory.CreateFromFunctions(
+            serverConfig.SkPluginConfig.PluginName,
+            serverConfig.SkPluginConfig.Description,
+            functions);
+    }
+    
+    private KernelFunction CreateSkFunctionFromMcpTool(McpTool mcpTool, 
+        IMcpClient mcpClient, McpServerConfig serverConfig)
+    {
+        var functionName = $"{serverConfig.SkPluginConfig.FunctionPrefix}{mcpTool.Name}";
+        
+        return KernelFunctionFactory.CreateFromMethod(
+            async (KernelArguments arguments) =>
+            {
+                // Convert SK arguments to MCP parameters
+                var mcpParameters = ConvertSkArgumentsToMcpParameters(arguments, mcpTool.Schema);
+                
+                // Execute MCP tool with SK error handling
+                var result = await ExecuteWithSkFilters(
+                    () => mcpClient.CallToolAsync(mcpTool.Name, mcpParameters),
+                    serverConfig);
+                
+                return result;
+            },
+            functionName,
+            mcpTool.Description,
+            GenerateSkParametersFromMcpSchema(mcpTool.Schema),
+            returnType: typeof(string));
+    }
+}
 
 ### Automatic Tool Discovery
 How MCP tools are discovered and registered with the workflow engine.

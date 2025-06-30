@@ -1,36 +1,45 @@
-# CLI Interface Specification
+# CLI Interface Specification (SK-Enhanced)
 
 ## Overview
 
-This document defines the complete command-line interface for the dotnet-prompt tool, including all commands, options, flags, arguments, and usage patterns.
+This document defines the complete command-line interface for the dotnet-prompt tool, including all commands, options, flags, arguments, and usage patterns optimized for Semantic Kernel integration.
 
 ## Status
-🚧 **DRAFT** - Requires detailed specification
+✅ **COMPLETE** - SK-enhanced CLI patterns defined
 
-## Global Installation
+## Global Installation (SK-Enabled)
 
 ```bash
-# Install the tool globally
+# Install the tool globally with SK capabilities
 dotnet tool install -g dotnet-prompt
 
-# Update to latest version
+# Update to latest version (includes SK updates)
 dotnet tool update -g dotnet-prompt
 
 # Uninstall
 dotnet tool uninstall -g dotnet-prompt
+
+# Verify SK integration
+dotnet prompt --version --sk-info
 ```
 
-## Main Command Structure
+## Main Command Structure (SK-Powered)
 
 ```
 dotnet prompt <command> [options] [arguments]
+
+Global SK Options:
+  --sk-debug                 Enable SK debugging and detailed function call logging
+  --sk-telemetry             Enable SK telemetry and performance monitoring
+  --sk-cache-dir <path>      Directory for SK conversation state and cache
+  --sk-vector-store <type>   Vector store type for SK memory (memory|file|qdrant|azuresearch)
 ```
 
-## Commands
+## Commands (SK-Enhanced)
 
-### 1. run - Execute Workflow
+### 1. run - Execute Workflow (SK Orchestration)
 
-Execute a workflow file with specified options.
+Execute a workflow file using SK automatic function calling and planning.
 
 ```bash
 dotnet prompt run <workflow-file> [options]
@@ -39,16 +48,26 @@ dotnet prompt run <workflow-file> [options]
 **Arguments:**
 - `<workflow-file>`: Path to the .prompt.md workflow file (required)
 
-**Options:**
+**SK-Enhanced Options:**
 - `--context <path>`: Working directory context (default: current directory)
 - `--project <path>`: Target .NET project file (.csproj/.sln)
 - `--provider <provider>`: Override AI provider (github|openai|azure|anthropic|local)
 - `--model <model>`: Override AI model name
-- `--verbose`: Enable verbose output
+- `--verbose`: Enable verbose output with SK function call details
 - `--output <path>`: Output directory for generated files
-- `--parameters <json>`: JSON string with workflow parameters
-- `--parameter <key=value>`: Individual parameter (can be used multiple times)
-- `--timeout <seconds>`: Execution timeout in seconds
+- `--parameters <json>`: JSON string with workflow parameters (SK validated)
+- `--parameter <key=value>`: Individual parameter with SK type validation (repeatable)
+- `--timeout <seconds>`: Execution timeout in seconds (applies to SK function calls)
+
+**SK-Specific Options:**
+- `--sk-function-choice <behavior>`: SK function choice behavior (auto|required|none)
+- `--sk-temperature <value>`: Override temperature for SK execution
+- `--sk-max-tokens <value>`: Override max tokens for SK responses
+- `--sk-plugins <list>`: Comma-separated list of SK plugins to enable
+- `--sk-disable-cache`: Disable SK conversation state and result caching
+- `--sk-parallel-functions`: Enable parallel SK function execution when possible
+- `--sk-retry-attempts <count>`: Number of retry attempts for failed SK functions
+- `--sk-conversation-id <id>`: Resume from specific SK conversation state
 - `--no-cache`: Disable caching of tool results
 - `--dry-run`: Validate workflow without execution
 

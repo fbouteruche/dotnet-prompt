@@ -37,17 +37,40 @@ All tools (built-in and MCP) are exposed through Semantic Kernel plugins with st
 - ✅ **Version Coupling**: Built-in tool versions are tied to the dotnet-prompt CLI version
 - ✅ **No Runtime Discovery**: Tools are not discovered at runtime - they are compiled into the CLI
 
-#### ✅ Plugin Registration with Semantic Kernel
+#### ✅ Plugin Registration with Semantic Kernel (Enhanced)
 ```csharp
-// Built-in tools are registered at CLI startup
+// Built-in tools are registered at CLI startup with comprehensive SK integration
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddBuiltInTools(this IServiceCollection services)
     {
-        // Register tool plugins as lazy-loaded services
+        // Register tool plugins as SK functions with full annotations
         services.AddScoped<ProjectAnalysisPlugin>();
         services.AddScoped<BuildTestPlugin>();
         services.AddScoped<FileSystemPlugin>();
+        
+        // Add SK-specific services for tool enhancement
+        services.AddScoped<IToolValidationFilter, BuiltInToolValidationFilter>();
+        services.AddScoped<IToolPerformanceFilter, BuiltInToolPerformanceFilter>();
+        services.AddScoped<IToolCacheManager, SkVectorStoreToolCache>();
+        
+        return services;
+    }
+    
+    public static KernelBuilder AddBuiltInToolPlugins(this KernelBuilder builder)
+    {
+        // Register SK plugins with comprehensive metadata
+        builder.Plugins.AddFromType<ProjectAnalysisPlugin>("ProjectAnalysis");
+        builder.Plugins.AddFromType<BuildTestPlugin>("BuildTest");
+        builder.Plugins.AddFromType<FileSystemPlugin>("FileSystem");
+        
+        // Add SK filters for cross-cutting concerns
+        builder.Services.AddSingleton<IFunctionInvocationFilter, ToolInvocationFilter>();
+        builder.Services.AddSingleton<IPromptRenderFilter, ToolSecurityFilter>();
+        
+        return builder;
+    }
+}
         
         return services;
     }

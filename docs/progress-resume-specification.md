@@ -1,53 +1,140 @@
-# Progress and Resume System Specification
+# Progress and Resume System Specification (SK-Powered)
 
 ## Overview
 
-This document defines the progress tracking and resume functionality, including state serialization, checkpoint strategies, and resume logic.
+This document defines the progress tracking and resume functionality leveraging Semantic Kernel's ChatHistory, conversation state management, and Vector Store persistence capabilities.
 
 ## Status
-🚧 **DRAFT** - Requires detailed specification
+✅ **COMPLETE** - SK-based progress tracking and resume patterns defined
 
-## Progress File Format
+## SK-Based Progress Management
 
-### Progress File Structure (`progress.md`)
-```markdown
-# Workflow Progress - [Timestamp]
+### Core Components
+- **SK ChatHistory**: Native conversation state management with automatic serialization
+- **SK Vector Store**: Persistent storage for conversation state and workflow metadata
+- **SK Conversation State**: Built-in checkpoint and resume capabilities
+- **SK Function Context**: Automatic parameter and execution state tracking
 
-## Execution Metadata
-- **Workflow**: workflow.prompt.md
-- **Started**: 2025-06-30T14:30:00Z
-- **Last Checkpoint**: 2025-06-30T14:35:22Z
-- **Status**: paused | failed | interrupted
-- **Reason**: timeout | error | user_interrupt
+### Progress Storage Architecture
 
-## Configuration
-```yaml
-model: "gpt-4o"
-provider: "github"
-temperature: 0.7
-```
-
-## Conversation History
-### Message 1 (User)
-[Original workflow prompt content]
-
-### Message 2 (Assistant)
-[AI response with tool calls]
-
-### Message 3 (Tool Results)
-```json
+#### SK ChatHistory Persistence
+```csharp
+public class SkProgressManager : IProgressManager
 {
-  "tool": "project-analysis",
-  "result": { ... },
-  "timestamp": "2025-06-30T14:32:15Z"
+    private readonly IVectorStore _vectorStore;
+    private readonly IChatHistory _chatHistory;
+    private readonly ILogger<SkProgressManager> _logger;
+    
+    public async Task SaveProgressAsync(string workflowId, WorkflowExecutionContext context)
+    {
+        // Use SK Vector Store for conversation persistence
+        var collection = _vectorStore.GetCollection<string, WorkflowProgress>("workflow_progress");
+        
+        var progressRecord = new WorkflowProgress
+        {
+            Id = workflowId,
+            ChatHistoryJson = JsonSerializer.Serialize(_chatHistory),
+            ExecutionContext = context,
+            LastCheckpoint = DateTimeOffset.UtcNow,
+            Status = WorkflowStatus.InProgress
+        };
+        
+        await collection.UpsertAsync(progressRecord);
+        _logger.LogInformation("Progress saved for workflow {WorkflowId} at checkpoint {Timestamp}", 
+            workflowId, progressRecord.LastCheckpoint);
+    }
+    
+    public async Task<WorkflowExecutionContext?> LoadProgressAsync(string workflowId)
+    {
+        var collection = _vectorStore.GetCollection<string, WorkflowProgress>("workflow_progress");
+        var progressRecord = await collection.GetAsync(workflowId);
+        
+        if (progressRecord == null) return null;
+        
+        // Restore SK ChatHistory from persisted state
+        var chatHistory = JsonSerializer.Deserialize<ChatHistory>(progressRecord.ChatHistoryJson);
+        await RestoreChatHistoryAsync(chatHistory);
+        
+        return progressRecord.ExecutionContext;
+    }
 }
 ```
 
-## Execution State
-- Current step: 3 of 5
-- Completed tools: ["project-analysis", "build-test"]
-- Pending operations: ["code-generation", "test-validation"]
-- Variable state: { "project_path": "./MyApp.csproj" }
+## Progress File Format (SK-Enhanced)
+
+### Enhanced Progress Structure (`sk-progress.json`)
+```json
+{
+  "workflow_metadata": {
+    "id": "workflow-abc123",
+    "file_path": "./workflow.prompt.md",
+    "started_at": "2025-06-30T14:30:00Z",
+    "last_checkpoint": "2025-06-30T14:35:22Z",
+    "status": "in_progress",
+    "sk_kernel_version": "1.0.0"
+  },
+  "sk_chat_history": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "[Original workflow content]",
+        "timestamp": "2025-06-30T14:30:05Z"
+      },
+      {
+        "role": "assistant", 
+        "content": "I'll help you with that project analysis.",
+        "function_calls": [
+          {
+            "function_name": "ProjectAnalysis.analyze_project",
+            "parameters": {
+              "project_path": "./MyApp.csproj",
+              "include_dependencies": true
+            },
+            "call_id": "call_abc123"
+          }
+        ],
+        "timestamp": "2025-06-30T14:30:10Z"
+      },
+      {
+        "role": "tool",
+        "content": "{\"project_type\": \"console\", \"target_framework\": \"net8.0\"}",
+        "tool_call_id": "call_abc123",
+        "timestamp": "2025-06-30T14:32:15Z"
+      }
+    ]
+  },
+  "sk_execution_state": {
+    "current_function_step": 2,
+    "completed_functions": ["ProjectAnalysis.analyze_project"],
+    "pending_functions": ["BuildTest.run_tests", "FileSystem.create_files"],
+    "function_results": {
+      "call_abc123": {
+        "function": "ProjectAnalysis.analyze_project",
+        "result": { "project_type": "console", "target_framework": "net8.0" },
+        "execution_time_ms": 2150,
+        "success": true
+      }
+    },
+    "conversation_variables": {
+      "project_path": "./MyApp.csproj",
+      "analysis_result": { "project_type": "console" }
+    }
+  },
+  "sk_configuration": {
+    "kernel_settings": {
+      "execution_settings": {
+        "function_choice_behavior": "auto",
+        "temperature": 0.7,
+        "max_tokens": 4000
+      }
+    },
+    "active_plugins": ["ProjectAnalysis", "BuildTest", "FileSystem"],
+    "ai_service": {
+      "provider": "github", 
+      "model": "gpt-4o"
+    }
+  }
+}
 ```
 
 ## State Serialization

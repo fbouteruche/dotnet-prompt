@@ -2,106 +2,447 @@
 
 ## Overview
 
-This document defines the exact format and structure for .prompt.md workflow files, including YAML frontmatter schema, markdown content structure, and validation rules.
+This document defines the exact format and structure for .prompt.md workflow files, following the [dotprompt format specification](https://google.github.io/dotprompt/reference/frontmatter/) with YAML frontmatter schema, markdown content structure, and validation rules.
 
 ## Status
-🚧 **DRAFT** - Requires detailed specification
+✅ **COMPLETE** - Standard dotprompt format specification defined
 
-## YAML Frontmatter Schema
+## Dotprompt YAML Frontmatter Schema
 
-### Required Fields
-- `model`: The AI model to use for this workflow
-- Additional required fields need to be defined
+### Core Dotprompt Fields
 
-### Optional Fields
-- `temperature`: Model temperature setting
-- `max_tokens`: Maximum tokens for model response
-- Additional optional fields need to be specified
+Following the standard dotprompt format specification:
 
-### Example Structure
 ```yaml
 ---
-model: "gpt-4o"
-temperature: 0.7
-max_tokens: 2000
+# Required/Core Fields
+name: "project-analysis-workflow"
+model: "github/gpt-4o"                    # Provider/model specification
+
+# Model Configuration
+config:
+  temperature: 0.7
+  maxOutputTokens: 4000
+  topP: 1.0
+  topK: 40
+  stopSequences: ["END", "\n---\n"]
+
+# Tool Integration
 tools:
-  - name: "dotnet-analyzer"
-  - name: "file-operations"
-mcp:
-  - server: "filesystem-mcp"
-    version: "1.0.0"
-  - server: "git-mcp"
-    version: "2.1.0"
-parameters:
-  - name: "project_path"
-    type: "string"
-    required: true
-    description: "Path to the .NET project"
+  - "project-analysis"                    # Built-in tools
+  - "build-test"
+  - "file-system"
+
+# Input Parameters
+input:
+  default:
+    include_dependencies: true
+    output_directory: "./docs"
+  schema:
+    project_path: 
+      type: string
+      description: "Path to the .NET project file (.csproj/.fsproj/.vbproj)"
+    output_directory:
+      type: string  
+      description: "Directory for generated documentation"
+    include_dependencies:
+      type: boolean
+      description: "Include dependency analysis in the output"
+
+# Output Format
+output:
+  format: text
+  schema:
+    analysis_result:
+      type: object
+      description: "Structured analysis results"
+    generated_files:
+      type: array
+      description: "List of generated documentation files"
+
+# Metadata for workflow management
+metadata:
+  description: "Comprehensive .NET project analysis with automated documentation generation"
+  author: "dotnet-prompt"
+  version: "1.0.0"
+  tags: ["analysis", "documentation", "dotnet"]
 ---
 ```
 
-## Markdown Content Structure
+### Extension Fields for dotnet-prompt
+
+Using dotprompt's extension mechanism for tool-specific configuration:
+
+```yaml
+---
+# Standard dotprompt fields
+name: "advanced-project-workflow"
+model: "github/gpt-4o"
+tools: ["project-analysis", "build-test", "file-system"]
+
+# dotnet-prompt extensions (using namespaced fields)
+dotnet-prompt.mcp:
+  - server: "filesystem-mcp"
+    version: "1.0.0"
+    config:
+      root_path: "./project"
+  - server: "git-mcp" 
+    version: "2.1.0"
+    config:
+      repository: "."
+
+dotnet-prompt.sub-workflows:
+  - name: "detailed-analysis"
+    path: "./analysis/detailed-project-analysis.prompt.md"
+    parameters:
+      analysis_depth: "comprehensive"
+  - name: "api-documentation"
+    path: "./docs/generate-api-docs.prompt.md"
+    depends_on: ["detailed-analysis"]
+
+dotnet-prompt.progress:
+  enabled: true
+  checkpoint_frequency: "after_each_tool"
+  storage_location: "./.dotnet-prompt/progress"
+
+dotnet-prompt.error-handling:
+  retry_attempts: 3
+  backoff_strategy: "exponential"
+  timeout_seconds: 300
+---
+```
+
+## Standard Dotprompt Markdown Content
+
+### Natural Language Workflow (Recommended)
+```markdown
+# Project Analysis and Documentation Generation
+
+I need to perform a comprehensive analysis of this .NET project and generate detailed documentation.
+
+## Analysis Phase
+
+Please analyze the project at `{{project_path}}` with the following requirements:
+- Examine the project structure and identify all source files
+- Analyze dependencies and detect any security vulnerabilities  
+- Generate metrics for code quality and test coverage
+- Document the architecture and component relationships
+
+## Documentation Phase
+
+Based on the analysis results, generate comprehensive documentation:
+- Create API documentation with examples for all public interfaces
+- Generate a detailed README with setup and usage instructions
+- Document the project architecture with diagrams
+- Create developer onboarding documentation
+
+## Validation Phase
+
+Finally, validate all generated documentation:
+- Check for consistency across all documentation files
+- Verify that all code examples compile and run correctly
+- Ensure documentation follows established style guidelines
+- Generate a documentation quality report
+
+Please save all outputs to the `{{output_directory}}` directory and provide a summary of what was generated.
+```
+
+### Explicit Tool Calls (When Needed)
+```markdown
+# Explicit Project Analysis Workflow
+
+## Step 1: Project Structure Analysis
+
+Analyze the project structure:
+{{project_path: "{{project_path}}"}}
+{{include_dependencies: "{{include_dependencies}}"}}
+{{include_tests: true}}
+
+## Step 2: Generate API Documentation
+
+Based on the analysis results, create comprehensive API documentation for all public interfaces with usage examples.
+
+## Step 3: Create Project README
+
+Generate a README file at `{{output_directory}}/README.md` that includes:
+- Project overview and description
+- Installation instructions
+- Quick start guide
+- API reference links
+
+Generated on: {{current_date}}
+```
 
 ### Sub-workflow References
-How sub-workflows are referenced and invoked within the main workflow content.
+```markdown
+# Main Analysis Workflow
 
-### Parameter Substitution
-How parameters are referenced and substituted in the workflow content.
+First, perform detailed project analysis:
 
-### Example Workflow File
-Complete example showing all features and syntax.
+> Execute: ./analysis/detailed-project-analysis.prompt.md
+> Parameters: 
+> - project_path: "{{project_path}}"
+> - analysis_depth: "comprehensive" 
+> - include_tests: true
 
-## Clarifying Questions
+Then generate documentation based on the analysis:
 
-### 1. YAML Frontmatter Schema
-- What are all the required fields in the frontmatter?
-- What are all the optional fields and their default values?
-- How should tool dependencies be declared?
-- How should MCP server dependencies be specified?
-- What parameter types are supported (string, number, boolean, array, object)?
-- How should parameter validation rules be defined?
+> Execute: ./docs/generate-api-docs.prompt.md
+> Parameters:
+> - project_metadata: "{{analysis_result.metadata}}"
+> - output_format: "markdown"
+> - include_examples: true
 
-### 2. Sub-workflow Integration
-- What is the syntax for referencing sub-workflows?
-- How are parameters passed to sub-workflows?
-- Can sub-workflows return values to the parent workflow?
-- How should relative vs absolute paths to sub-workflows be handled?
-- Can sub-workflows be nested (sub-workflow calling another sub-workflow)?
+Finally, validate all generated documentation for consistency and completeness.
+```
 
-### 3. Parameter System
-- How are parameters defined in the frontmatter?
-- What is the syntax for parameter substitution in markdown content?
-- How should parameter validation work?
-- Can parameters have default values?
-- How should complex parameter types (objects, arrays) be handled?
+## Parameter Substitution
 
-### 4. Tool Integration Syntax
-- How should built-in tools be referenced in workflows?
-- How should MCP tools be referenced and used?
-- What is the syntax for tool calls within markdown content?
-- How should tool parameters be passed?
+### Standard Parameter References
+- `{{parameter_name}}`: Direct parameter substitution from input schema
+- `{{analysis_result.property}}`: Access to previous tool results
+- `{{current_date}}`: Built-in system variables
+- `{{project_metadata.name}}`: Nested object property access
 
-### 5. Validation Rules
-- What constitutes a valid workflow file?
-- How should validation errors be reported?
-- Should there be different validation levels (syntax, semantic, runtime)?
-- How should missing dependencies be handled during validation?
+### Complex Parameter Examples
+```yaml
+input:
+  schema:
+    project_config:
+      type: object
+      properties:
+        name: {type: string}
+        version: {type: string}
+        target_framework: {type: string}
+    build_options:
+      type: array
+      items: {type: string}
+```
 
-### 6. File Organization
-- Should there be a standard directory structure for workflows?
-- How should shared sub-workflows be organized?
-- Should there be a workflow discovery mechanism?
-- How should workflow dependencies be managed?
+Usage in content:
+```markdown
+Building project {{project_config.name}} version {{project_config.version}} 
+for {{project_config.target_framework}} with options: {{build_options}}
+```
 
-### 7. Versioning and Compatibility
-- How should workflow format versioning work?
-- What happens when a workflow uses features not supported by the current tool version?
-- How should backward compatibility be maintained?
+## Validation Rules
 
-## Next Steps
+### Required Elements
+1. **Valid YAML frontmatter**: Must parse as valid YAML between `---` delimiters
+2. **Model specification**: Either in `model` field or global configuration
+3. **Input schema validation**: Parameters must match defined input schema
+4. **Tool dependencies**: All referenced tools must be available (built-in or MCP)
 
-1. Define the complete YAML frontmatter schema with all fields
-2. Specify the markdown content syntax and structure
-3. Create comprehensive workflow examples
-4. Define validation rules and error messages
-5. Specify file organization and discovery patterns
+### Optional Elements
+- Frontmatter can be completely omitted for simple workflows
+- All dotprompt fields are optional and have reasonable defaults
+- Extension fields provide additional functionality without breaking compatibility
+
+### Validation Levels
+
+#### Syntax Validation
+```bash
+dotnet prompt validate workflow.prompt.md
+```
+- YAML frontmatter syntax
+- Parameter substitution syntax
+- Sub-workflow reference syntax
+- Tool reference validation
+
+#### Semantic Validation
+- Parameter type checking
+- Tool availability verification
+- Sub-workflow dependency validation
+- Model/provider compatibility
+
+#### Runtime Validation
+- File path existence (for file parameters)
+- Network connectivity (for remote models)
+- Tool execution capabilities
+- Permission validation
+
+## File Organization
+
+### Standard Directory Structure
+```
+project-root/
+├── .dotnet-prompt/
+│   ├── config.json          # Project configuration
+│   ├── mcp.json             # MCP server definitions
+│   └── progress/            # Progress files
+├── workflows/
+│   ├── analysis/
+│   │   ├── project-analysis.prompt.md
+│   │   └── dependency-scan.prompt.md
+│   ├── docs/
+│   │   ├── api-docs.prompt.md
+│   │   └── readme-gen.prompt.md
+│   └── main-workflow.prompt.md
+└── MyProject.csproj
+```
+
+### Workflow Discovery
+- Automatic discovery of `.prompt.md` files in current directory and subdirectories
+- `dotnet prompt list` shows available workflows with descriptions from metadata
+- Sub-workflow references use relative paths from the main workflow file
+
+## Complete Example
+
+### project-analysis.prompt.md
+```yaml
+---
+name: "comprehensive-project-analysis"
+model: "github/gpt-4o"
+tools: ["project-analysis", "build-test", "file-system"]
+
+config:
+  temperature: 0.3
+  maxOutputTokens: 8000
+  stopSequences: ["END_ANALYSIS"]
+
+input:
+  default:
+    include_dependencies: true
+    include_tests: true
+    output_format: "markdown"
+  schema:
+    project_path:
+      type: string
+      description: "Path to the .NET project file"
+    output_directory:
+      type: string
+      description: "Directory for analysis output"
+    include_dependencies:
+      type: boolean
+      description: "Include dependency analysis"
+    include_tests:
+      type: boolean
+      description: "Include test analysis"
+    output_format:
+      type: string
+      enum: ["markdown", "json", "html"]
+      description: "Format for analysis output"
+
+output:
+  format: json
+  schema:
+    project_info:
+      type: object
+      properties:
+        name: {type: string}
+        version: {type: string}
+        target_framework: {type: string}
+    analysis_results:
+      type: object
+      properties:
+        file_count: {type: number}
+        dependency_count: {type: number}
+        test_coverage: {type: number}
+    generated_files:
+      type: array
+      items: {type: string}
+
+metadata:
+  description: "Comprehensive .NET project analysis with dependency scanning and test coverage"
+  author: "dotnet-prompt team"
+  version: "1.2.0"
+  tags: ["analysis", "dotnet", "dependencies", "testing"]
+
+# Extension fields for dotnet-prompt specific features
+dotnet-prompt.mcp:
+  - server: "filesystem-mcp"
+    version: "1.0.0"
+  - server: "dependency-scanner-mcp"
+    version: "2.1.0"
+
+dotnet-prompt.sub-workflows:
+  - name: "security-scan"
+    path: "./security/vulnerability-scan.prompt.md"
+    condition: "{{include_dependencies}}"
+  - name: "documentation-gen" 
+    path: "./docs/generate-docs.prompt.md"
+    depends_on: ["security-scan"]
+
+dotnet-prompt.progress:
+  enabled: true
+  checkpoint_frequency: "after_each_tool"
+  auto_resume: true
+---
+
+# Comprehensive .NET Project Analysis
+
+I need to perform a thorough analysis of the .NET project at `{{project_path}}` and generate comprehensive documentation.
+
+## Project Structure Analysis
+
+First, analyze the overall project structure:
+- Examine the project file and configuration
+- Identify all source code files and their organization
+- Document the project architecture and dependencies
+- Analyze the build configuration and target frameworks
+
+## Dependency Analysis
+
+{{#if include_dependencies}}
+Perform detailed dependency analysis:
+- List all NuGet package references with versions
+- Identify potential security vulnerabilities in dependencies
+- Check for outdated packages and suggest updates
+- Document the dependency graph and potential conflicts
+{{/if}}
+
+## Test Coverage Analysis
+
+{{#if include_tests}}
+Analyze the test suite:
+- Identify all test projects and frameworks used
+- Calculate test coverage metrics for the codebase
+- Document test patterns and identify gaps in coverage
+- Suggest improvements to the testing strategy
+{{/if}}
+
+## Documentation Generation
+
+Generate comprehensive documentation:
+- Create API documentation for all public interfaces
+- Generate architectural overview with component diagrams
+- Document setup and deployment procedures
+- Create developer onboarding guide
+
+## Output Summary
+
+Save all analysis results to `{{output_directory}}` in {{output_format}} format:
+- Project analysis report
+- Dependency vulnerability report (if applicable)
+- Test coverage report (if applicable)
+- Generated documentation files
+
+Provide a structured summary of all findings and generated artifacts.
+
+END_ANALYSIS
+```
+
+This example demonstrates:
+- **Standard dotprompt compliance**: Using official dotprompt schema
+- **Tool integration**: Built-in and MCP tools
+- **Parameter handling**: Complex input/output schemas
+- **Sub-workflow composition**: Conditional and dependent workflows
+- **Extension fields**: dotnet-prompt specific features using namespaced fields
+- **Natural language workflow**: AI-friendly prompt structure
+- **Conditional logic**: Using handlebars-style conditionals for parameter-driven behavior
+
+## References
+
+### Dotprompt Format Specification
+This workflow format is based on and fully compliant with the official [Dotprompt format specification](https://google.github.io/dotprompt/reference/frontmatter/) maintained by Google Firebase team.
+
+**Key Documentation:**
+- **Frontmatter Reference**: [https://google.github.io/dotprompt/reference/frontmatter/](https://google.github.io/dotprompt/reference/frontmatter/)
+- **Schema Documentation**: [https://google.github.io/dotprompt/reference/frontmatter/schema](https://google.github.io/dotprompt/reference/frontmatter/schema)
+- **Dotprompt Overview**: [https://google.github.io/dotprompt/](https://google.github.io/dotprompt/)
+
+### Extension Mechanism
+The `dotnet-prompt.*` namespaced fields use dotprompt's [frontmatter extensions](https://google.github.io/dotprompt/reference/frontmatter/#frontmatter-extensions) mechanism to provide tool-specific functionality while maintaining full compatibility with the standard format.
+
+### Standards Compliance
+All `.prompt.md` files created for dotnet-prompt are valid dotprompt files that can be used with any dotprompt-compatible implementation. The dotprompt format serves as the authoritative specification for workflow file structure and syntax.

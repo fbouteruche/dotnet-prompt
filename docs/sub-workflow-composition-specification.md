@@ -1,54 +1,152 @@
-# Sub-workflow Composition Specification
+# Sub-workflow Composition Specification (SK-Orchestrated)
 
 ## Overview
 
-This document defines how workflows can compose and invoke sub-workflows, including parameter passing, context inheritance, and dependency resolution.
+This document defines how workflows can compose and invoke sub-workflows using Semantic Kernel's automatic function calling and planning capabilities, including parameter passing, context inheritance, and dependency resolution.
 
 ## Status
-🚧 **DRAFT** - Requires detailed specification
+✅ **COMPLETE** - SK-based workflow composition patterns defined
 
-## Sub-workflow Reference Syntax
+## SK-Based Sub-workflow Architecture
 
-### Workflow Invocation
+### Core Integration Strategy
+- **SK Function Calling**: Sub-workflows are exposed as SK functions for automatic orchestration
+- **Automatic Planning**: SK automatically determines sub-workflow execution order and dependencies
+- **Context Inheritance**: SK ChatHistory and conversation state seamlessly flow between workflows
+- **Parameter Mapping**: SK automatic parameter validation and type conversion
+- **Error Propagation**: SK filters handle errors across the entire workflow composition
+
+### Sub-workflow as SK Function
+
+#### Workflow Function Registration
+```csharp
+[KernelFunction("invoke_sub_workflow")]
+[Description("Executes a sub-workflow and returns its results")]
+public async Task<WorkflowResult> InvokeSubWorkflowAsync(
+    [Description("Path to the sub-workflow file")] string workflowPath,
+    [Description("Parameters to pass to the sub-workflow")] Dictionary<string, object> parameters,
+    [Description("Context inheritance mode: inherit, isolated, or merge")] string contextMode = "inherit",
+    KernelArguments? arguments = null,
+    CancellationToken cancellationToken = default)
+{
+    // SK automatically handles parameter validation and type conversion
+    var subWorkflowContext = await CreateSubWorkflowContext(workflowPath, parameters, contextMode, arguments);
+    
+    // Execute sub-workflow with SK orchestration
+    var subKernel = await _kernelFactory.CreateKernelForSubWorkflowAsync(subWorkflowContext);
+    var result = await subKernel.InvokeAsync("execute_workflow", subWorkflowContext.ToKernelArguments());
+    
+    return new WorkflowResult
+    {
+        Success = true,
+        Result = result.GetValue<string>(),
+        Context = subWorkflowContext,
+        ExecutionMetadata = ExtractExecutionMetadata(result)
+    };
+}
+```
+
+## Sub-workflow Reference Syntax (SK-Enhanced)
+
+### Automatic Function Calling Workflow Composition
 ```markdown
-Execute the project analysis sub-workflow:
+I need to analyze this project and generate comprehensive documentation.
 
-{{invoke: ./analysis/project-analysis.prompt.md
+First, analyze the project structure and dependencies:
+- Use the project analysis workflow to examine the codebase
+- Include dependency analysis and test coverage information
+- Store the results for subsequent workflows
+
+Then, based on the analysis results, generate multiple documentation types:
+- API documentation from the code structure
+- README file with project overview and setup instructions  
+- Architecture documentation showing component relationships
+
+Finally, validate all generated documentation for consistency and completeness.
+```
+
+> **SK Automatic Planning**: With this natural language description and the registered sub-workflow functions, SK will automatically:
+> 1. Call `invoke_sub_workflow` for project analysis
+> 2. Pass analysis results to documentation generation workflows
+> 3. Execute validation workflows with generated documentation
+> 4. Handle parameter passing and context inheritance automatically
+
+### Explicit Sub-workflow Invocation (SK Functions)
+```markdown
+Execute project analysis and documentation generation:
+
+{{sk_function: invoke_sub_workflow
   parameters:
-    project_path: "{{project_path}}"
-    include_tests: true
-  context: inherit
+    workflow_path: "./analysis/project-analysis.prompt.md"
+    parameters:
+      project_path: "{{project_path}}"
+      include_tests: true
+      analysis_depth: "comprehensive"
+    context_mode: "inherit"
 }}
 
-Based on the analysis results, generate documentation:
+Generate API documentation using analysis results:
 
-{{invoke: ./docs/generate-api-docs.prompt.md
+{{sk_function: invoke_sub_workflow
   parameters:
-    project_metadata: "{{analysis_result.metadata}}"
-    output_format: "markdown"
-  context: isolated
+    workflow_path: "./docs/generate-api-docs.prompt.md" 
+    parameters:
+      project_metadata: "{{previous_result.metadata}}"
+      output_format: "markdown"
+      include_examples: true
+    context_mode: "merge"
 }}
 ```
 
-### Parameter Passing
+### Enhanced Parameter Mapping with SK Validation
 ```yaml
-# Main workflow frontmatter
+# Main workflow frontmatter with SK integration
 ---
+sk_configuration:
+  execution_settings:
+    function_choice_behavior: "auto"
+    temperature: 0.7
+    max_tokens: 4000
+  
 parameters:
   - name: "project_path"
     type: "string"
     required: true
-  - name: "output_directory"
+    description: "Path to the .NET project file"
+    sk_validation:
+      pattern: ".*\\.(csproj|fsproj|vbproj)$"
+      file_exists: true
+  - name: "output_directory" 
     type: "string"
     default: "./docs"
+    description: "Directory for generated documentation"
+    sk_validation:
+      ensure_directory: true
+      writable: true
+
+sub_workflows:
+  - name: "project_analysis"
+    path: "./analysis/project-analysis.prompt.md"
+    sk_function_config:
+      timeout_seconds: 300
+      retry_attempts: 2
+      cache_results: true
 ---
 
-# Sub-workflow invocation with parameter mapping
-{{invoke: ./sub-workflow.prompt.md
+# SK will automatically orchestrate these workflows based on the prompt content
+{{sk_function: invoke_sub_workflow
   parameters:
-    input_path: "{{project_path}}"
-    output_path: "{{output_directory}}/analysis"
+    workflow_path: "{{sub_workflows.project_analysis.path}}"
+    parameters:
+      input_path: "{{project_path}}"
+      output_path: "{{output_directory}}/analysis"
+      analysis_options:
+        include_dependencies: true
+        scan_for_vulnerabilities: false
+        generate_metrics: true
+    context_mode: "inherit"
 }}
+```
 ```
 
 ## Context Inheritance
