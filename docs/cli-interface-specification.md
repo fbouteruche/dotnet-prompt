@@ -1,45 +1,39 @@
-# CLI Interface Specification (SK-Enhanced)
+# CLI Interface Specification
 
 ## Overview
 
-This document defines the complete command-line interface for the dotnet-prompt tool, including all commands, options, flags, arguments, and usage patterns optimized for Semantic Kernel integration.
+This document defines the complete command-line interface for the dotnet-prompt tool, including all commands, options, flags, arguments, and usage patterns.
 
 ## Status
-✅ **COMPLETE** - SK-enhanced CLI patterns defined
+✅ **COMPLETE** - Complete CLI interface specification defined
 
-## Global Installation (SK-Enabled)
+## Global Installation
 
 ```bash
-# Install the tool globally with SK capabilities
+# Install the tool globally
 dotnet tool install -g dotnet-prompt
 
-# Update to latest version (includes SK updates)
+# Update to latest version
 dotnet tool update -g dotnet-prompt
 
 # Uninstall
 dotnet tool uninstall -g dotnet-prompt
 
-# Verify SK integration
-dotnet prompt --version --sk-info
+# Verify installation
+dotnet prompt --version
 ```
 
-## Main Command Structure (SK-Powered)
+## Main Command Structure
 
 ```
 dotnet prompt <command> [options] [arguments]
-
-Global SK Options:
-  --sk-debug                 Enable SK debugging and detailed function call logging
-  --sk-telemetry             Enable SK telemetry and performance monitoring
-  --sk-cache-dir <path>      Directory for SK conversation state and cache
-  --sk-vector-store <type>   Vector store type for SK memory (memory|file|qdrant|azuresearch)
 ```
 
-## Commands (SK-Enhanced)
+## Commands
 
-### 1. run - Execute Workflow (SK Orchestration)
+### 1. run - Execute Workflow
 
-Execute a workflow file using SK automatic function calling and planning.
+Execute a workflow file using AI orchestration and tool calling.
 
 ```bash
 dotnet prompt run <workflow-file> [options]
@@ -48,26 +42,16 @@ dotnet prompt run <workflow-file> [options]
 **Arguments:**
 - `<workflow-file>`: Path to the .prompt.md workflow file (required)
 
-**SK-Enhanced Options:**
+**Options:**
 - `--context <path>`: Working directory context (default: current directory)
 - `--project <path>`: Target .NET project file (.csproj/.sln)
 - `--provider <provider>`: Override AI provider (github|openai|azure|anthropic|local)
 - `--model <model>`: Override AI model name
-- `--verbose`: Enable verbose output with SK function call details
+- `--verbose`: Enable verbose output with detailed execution logging
 - `--output <path>`: Output directory for generated files
-- `--parameters <json>`: JSON string with workflow parameters (SK validated)
-- `--parameter <key=value>`: Individual parameter with SK type validation (repeatable)
-- `--timeout <seconds>`: Execution timeout in seconds (applies to SK function calls)
-
-**SK-Specific Options:**
-- `--sk-function-choice <behavior>`: SK function choice behavior (auto|required|none)
-- `--sk-temperature <value>`: Override temperature for SK execution
-- `--sk-max-tokens <value>`: Override max tokens for SK responses
-- `--sk-plugins <list>`: Comma-separated list of SK plugins to enable
-- `--sk-disable-cache`: Disable SK conversation state and result caching
-- `--sk-parallel-functions`: Enable parallel SK function execution when possible
-- `--sk-retry-attempts <count>`: Number of retry attempts for failed SK functions
-- `--sk-conversation-id <id>`: Resume from specific SK conversation state
+- `--parameters <json>`: JSON string with workflow parameters
+- `--parameter <key=value>`: Individual parameter (repeatable)
+- `--timeout <seconds>`: Execution timeout in seconds
 - `--no-cache`: Disable caching of tool results
 - `--dry-run`: Validate workflow without execution
 
@@ -266,7 +250,6 @@ dotnet prompt init [options]
 ```
 
 **Options:**
-- `--template <template>`: Use configuration template (basic|enterprise|team)
 - `--provider <provider>`: Set default AI provider
 - `--force`: Overwrite existing configuration
 
@@ -275,8 +258,8 @@ dotnet prompt init [options]
 # Basic initialization
 dotnet prompt init
 
-# Initialize with template
-dotnet prompt init --template enterprise --provider azure
+# Initialize with specific provider
+dotnet prompt init --provider azure
 
 # Force overwrite existing config
 dotnet prompt init --force
@@ -301,6 +284,7 @@ Environment variables that affect tool behavior:
 - `DOTNET_PROMPT_CONFIG`: Path to configuration file
 - `DOTNET_PROMPT_TIMEOUT`: Default timeout in seconds
 - `DOTNET_PROMPT_NO_TELEMETRY`: Disable telemetry (true/false)
+- `DOTNET_PROMPT_CACHE_DIR`: Directory for caching conversation state and results
 
 ## Exit Codes
 
@@ -312,84 +296,3 @@ Environment variables that affect tool behavior:
 - `5`: Authentication error
 - `6`: Network error
 - `7`: Permission error
-
-## Clarifying Questions
-
-### 1. Command Structure
-- Are there additional commands needed beyond the core set?
-- Should there be command aliases or shortcuts?
-- How should command grouping work for related operations?
-- Should there be hidden/advanced commands for power users?
-- How should command discoverability work?
-
-### 2. Option Design
-- What is the complete set of options for each command?
-- How should option defaults be determined?
-- Which options should be global vs command-specific?
-- Should there be option validation and constraint checking?
-- How should conflicting options be handled?
-
-### 3. Parameter Handling
-- How should complex parameters be passed via CLI?
-- Should there be support for parameter files?
-- How should parameter validation work at the CLI level?
-- Should there be parameter templates or presets?
-- How should sensitive parameters be handled securely?
-
-### 4. Output Formatting
-- What output formats should be supported?
-- How should structured data be displayed in different formats?
-- Should there be customizable output templates?
-- How should error output be formatted?
-- Should there be machine-readable output options?
-
-### 5. Interactive Features
-- Should there be interactive modes for any commands?
-- How should user prompts and confirmations work?
-- Should there be wizard-style command execution?
-- How should progress indication work for long operations?
-- Should there be real-time status updates?
-
-### 6. Help and Documentation
-- How should command help be structured and displayed?
-- Should there be examples in help output?
-- How should subcommand help work?
-- Should there be man page generation?
-- How should command completion work?
-
-### 7. Configuration Integration
-- How should CLI options interact with configuration files?
-- Which settings should be overridable via command line?
-- How should environment variables be prioritized?
-- Should there be configuration validation commands?
-- How should configuration discovery work?
-
-### 8. Error Handling
-- How should CLI parsing errors be handled?
-- What validation should occur before command execution?
-- How should missing dependencies be reported?
-- Should there be error recovery suggestions?
-- How should partial command completion work?
-
-### 9. Shell Integration
-- Should there be shell completion scripts?
-- How should the tool integrate with different shells?
-- Should there be shell-specific features?
-- How should command history work?
-- Should there be shell function generation?
-
-### 10. Advanced Features
-- Should there be batch execution capabilities?
-- How should command chaining or piping work?
-- Should there be daemon/service mode?
-- How should remote execution work?
-- Should there be plugin architecture for custom commands?
-
-## Next Steps
-
-1. Finalize the complete command set and options
-2. Implement CLI parsing and validation
-3. Create help system and documentation
-4. Build shell completion support
-5. Design output formatting system
-6. Implement configuration integration
