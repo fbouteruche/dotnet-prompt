@@ -20,8 +20,11 @@ dotnet-prompt enables developers to create and execute sophisticated AI workflow
 ### Installation
 
 ```bash
-# Install globally as a .NET tool
+# Install globally as a .NET tool (once published to NuGet)
 dotnet tool install -g dotnet-prompt
+
+# For development/testing, install from local package
+dotnet tool install --global --add-source ./src/DotnetPrompt.Cli/bin/Release DotnetPrompt.Cli
 
 # Verify installation
 dotnet prompt --version
@@ -46,6 +49,54 @@ Please analyze the current .NET project and provide a comprehensive report inclu
 - Test coverage analysis
 
 Generate documentation and suggest improvements where needed.
+```
+
+2. **Execute the workflow**:
+
+```bash
+# Basic execution
+dotnet prompt run analyze-project.prompt.md
+
+# Dry run (validation only)
+dotnet prompt run analyze-project.prompt.md --dry-run
+
+# With verbose output
+dotnet prompt run analyze-project.prompt.md --verbose
+
+# With custom context and timeout
+dotnet prompt run analyze-project.prompt.md --context ./src --timeout 600
+```
+
+### CLI Commands
+
+```bash
+# Show help
+dotnet prompt --help
+
+# Show version
+dotnet prompt --version
+
+# Run a workflow
+dotnet prompt run <workflow-file> [options]
+
+# Available run options:
+#   --context <path>    Working directory context
+#   --dry-run          Validate workflow without execution
+#   --timeout <secs>   Execution timeout in seconds
+#   --verbose          Enable verbose output
+```
+
+### Environment Variables
+
+```bash
+# Enable verbose logging
+export DOTNET_PROMPT_VERBOSE=true
+
+# Set default timeout
+export DOTNET_PROMPT_TIMEOUT=300
+
+# Disable telemetry
+export DOTNET_PROMPT_NO_TELEMETRY=true
 ```
 
 2. **Execute the workflow**:
