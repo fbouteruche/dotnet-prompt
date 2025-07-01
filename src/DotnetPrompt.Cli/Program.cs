@@ -5,6 +5,7 @@ using DotnetPrompt.Cli.Commands;
 using DotnetPrompt.Core;
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Parsing;
+using DotnetPrompt.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -69,8 +70,12 @@ public class Program
         // Register parsing services
         services.AddScoped<IDotpromptParser, DotpromptParser>();
 
+        // Register configuration services
+        services.AddConfigurationServices();
+
         // Register commands
         services.AddScoped<RunCommand>();
+        services.AddScoped<ConfigCommand>();
 
         return services;
     }
@@ -99,6 +104,9 @@ public class Program
         // Add commands
         var runCommand = serviceProvider.GetRequiredService<RunCommand>();
         rootCommand.AddCommand(runCommand);
+
+        var configCommand = serviceProvider.GetRequiredService<ConfigCommand>();
+        rootCommand.AddCommand(configCommand);
 
         return rootCommand;
     }

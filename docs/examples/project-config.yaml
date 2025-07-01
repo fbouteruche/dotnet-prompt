@@ -1,0 +1,50 @@
+# Project Configuration Example
+# Located at: ./dotnet-prompt.yaml or ./.dotnet-prompt/config.yaml
+
+# Project-specific provider and model
+default_provider: "azure"
+default_model: "gpt-4"
+
+# Project-specific cache directory
+cache_directory: "./.dotnet-prompt/cache"
+
+# Provider configurations (project-specific)
+providers:
+  # Azure OpenAI for this project
+  azure:
+    api_key: "${AZURE_OPENAI_API_KEY}"
+    endpoint: "${AZURE_OPENAI_ENDPOINT}"
+    deployment: "gpt-4-project"
+    api_version: "2024-06-01"
+    timeout: 600  # Longer timeout for this project
+  
+  # Local development setup
+  local:
+    base_url: "http://localhost:8080/v1"
+    api_key: "local-dev-key"
+
+# Project-specific logging
+logging:
+  level: "Debug"
+  file: "./logs/dotnet-prompt.log"
+  structured: true
+
+# Project-specific tool configuration
+tool_configuration:
+  project_analysis:
+    include_private_members: true
+    max_file_size_bytes: 2097152  # 2MB for larger project files
+    excluded_directories: ["bin", "obj", ".git", "packages", "TestResults"]
+    include_generated_code: false
+  
+  build_test:
+    default_configuration: "Release"
+    verbose_logging: true
+    timeout_seconds: 600
+    parallel_execution: false  # Sequential builds for CI
+    excluded_test_categories: ["Integration", "Performance"]
+  
+  file_system:
+    allowed_directories: ["./src", "./docs", "./scripts"]
+    max_file_size_bytes: 5242880  # 5MB
+    enable_audit_logging: true
