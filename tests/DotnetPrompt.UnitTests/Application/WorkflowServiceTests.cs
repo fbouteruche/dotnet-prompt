@@ -1,5 +1,7 @@
 using DotnetPrompt.Application.Services;
 using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Models;
+using DotnetPrompt.Core.Parsing;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -8,12 +10,14 @@ namespace DotnetPrompt.UnitTests.Application;
 public class WorkflowServiceTests
 {
     private readonly Mock<ILogger<WorkflowService>> _mockLogger;
+    private readonly Mock<IDotpromptParser> _mockParser;
     private readonly WorkflowService _workflowService;
 
     public WorkflowServiceTests()
     {
         _mockLogger = new Mock<ILogger<WorkflowService>>();
-        _workflowService = new WorkflowService(_mockLogger.Object);
+        _mockParser = new Mock<IDotpromptParser>();
+        _workflowService = new WorkflowService(_mockLogger.Object, _mockParser.Object);
     }
 
     [Fact]
@@ -21,6 +25,14 @@ public class WorkflowServiceTests
     {
         // Arrange
         var nonExistentFile = "non-existent.prompt.md";
+        var dotpromptResult = DotpromptValidationResult.Invalid(new DotpromptValidationError
+        {
+            Message = $"Workflow file not found: {nonExistentFile}",
+            ErrorCode = "FILE_NOT_FOUND"
+        });
+        
+        _mockParser.Setup(p => p.ValidateFileAsync(nonExistentFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(dotpromptResult);
 
         // Act
         var result = await _workflowService.ValidateAsync(nonExistentFile);
@@ -38,6 +50,15 @@ public class WorkflowServiceTests
         // Arrange
         var tempFile = Path.GetTempFileName();
         await File.WriteAllTextAsync(tempFile, "test content");
+
+        var dotpromptResult = DotpromptValidationResult.Invalid(new DotpromptValidationError
+        {
+            Message = "Workflow file must have .prompt.md extension",
+            ErrorCode = "INVALID_EXTENSION"
+        });
+        
+        _mockParser.Setup(p => p.ValidateFileAsync(tempFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(dotpromptResult);
 
         try
         {
@@ -64,6 +85,9 @@ public class WorkflowServiceTests
         var validWorkflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
         await File.WriteAllTextAsync(validWorkflowFile, "# Valid workflow content");
 
+        _mockParser.Setup(p => p.ValidateFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(DotpromptValidationResult.Valid());
+
         try
         {
             // Act
@@ -85,6 +109,9 @@ public class WorkflowServiceTests
         var nonExistentFile = "non-existent.prompt.md";
         var options = new WorkflowExecutionOptions();
 
+        _mockParser.Setup(p => p.ParseFileAsync(nonExistentFile, It.IsAny<CancellationToken>()))
+                   .ThrowsAsync(new DotpromptParseException($"Workflow file not found: {nonExistentFile}", nonExistentFile));
+
         // Act
         var result = await _workflowService.ExecuteAsync(nonExistentFile, options);
 
@@ -101,6 +128,9 @@ public class WorkflowServiceTests
         var validWorkflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
         await File.WriteAllTextAsync(validWorkflowFile, "# Valid workflow content");
         var options = new WorkflowExecutionOptions(DryRun: true);
+
+        _mockParser.Setup(p => p.ValidateFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(DotpromptValidationResult.Valid());
 
         try
         {
@@ -125,6 +155,16 @@ public class WorkflowServiceTests
         var validWorkflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
         await File.WriteAllTextAsync(validWorkflowFile, "# Valid workflow content");
         var options = new WorkflowExecutionOptions(DryRun: false);
+
+        var mockWorkflow = new DotpromptWorkflow
+        {
+            Name = "test-workflow",
+            FilePath = validWorkflowFile,
+            Content = new WorkflowContent { RawMarkdown = "# Valid workflow content" }
+        };
+        
+        _mockParser.Setup(p => p.ParseFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(mockWorkflow);
 
         try
         {

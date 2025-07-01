@@ -69,7 +69,7 @@ public class CliIntegrationTests
         // Arrange
         var tempFile = Path.GetTempFileName();
         var workflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
-        await File.WriteAllTextAsync(workflowFile, "---\nmodel: gpt-4o\n---\n# Test workflow");
+        await File.WriteAllTextAsync(workflowFile, "---\nname: test-workflow\nmodel: gpt-4o\n---\n# Test workflow\n\nThis is a valid test workflow.");
 
         try
         {
