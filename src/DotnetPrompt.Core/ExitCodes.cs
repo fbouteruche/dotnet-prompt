@@ -44,4 +44,14 @@ public static class ExitCodes
     /// Permission error
     /// </summary>
     public const int PermissionError = 7;
+    
+    /// <summary>
+    /// Invalid arguments
+    /// </summary>
+    public const int InvalidArguments = 8;
+    
+    /// <summary>
+    /// Validation error
+    /// </summary>
+    public const int ValidationError = 9;
 }

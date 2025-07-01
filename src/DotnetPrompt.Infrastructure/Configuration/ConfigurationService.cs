@@ -5,6 +5,7 @@ using DotnetPrompt.Core.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NetEscapades.Configuration.Yaml;
+using YamlDotNet.Serialization;
 
 namespace DotnetPrompt.Infrastructure.Configuration;
 
@@ -136,6 +137,21 @@ public class ConfigurationService : IConfigurationService
 
         var json = JsonSerializer.Serialize(configuration, JsonOptions);
         await File.WriteAllTextAsync(filePath, json, cancellationToken);
+
+        // If the file path is YAML, convert and save as YAML
+        if (Path.GetExtension(filePath).ToLowerInvariant() is ".yaml" or ".yml")
+        {
+            var serializer = new SerializerBuilder()
+                .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.UnderscoredNamingConvention.Instance)
+                .Build();
+            
+            var yaml = serializer.Serialize(configuration);
+            await File.WriteAllTextAsync(filePath, yaml, cancellationToken);
+        }
+        else
+        {
+            await File.WriteAllTextAsync(filePath, json, cancellationToken);
+        }
 
         _logger.LogInformation("Configuration saved to {FilePath}", filePath);
     }

@@ -1,0 +1,10 @@
+# Minimal Configuration Example
+# Shows the minimum required configuration for dotnet-prompt
+
+# Just specify your preferred provider
+default_provider: "openai"
+
+# Provider configuration with environment variable
+providers:
+  openai:
+    api_key: "${OPENAI_API_KEY}"
