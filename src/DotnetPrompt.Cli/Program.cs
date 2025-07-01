@@ -4,6 +4,7 @@ using DotnetPrompt.Application.Services;
 using DotnetPrompt.Cli.Commands;
 using DotnetPrompt.Core;
 using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Parsing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -64,6 +65,9 @@ public class Program
 
         // Register application services
         services.AddScoped<IWorkflowService, WorkflowService>();
+
+        // Register parsing services
+        services.AddScoped<IDotpromptParser, DotpromptParser>();
 
         // Register commands
         services.AddScoped<RunCommand>();
