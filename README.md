@@ -20,7 +20,7 @@ dotnet-prompt enables developers to create and execute sophisticated AI workflow
 ### Installation
 
 ```bash
-# Install globally as a .NET tool
+# Install globally as a .NET tool (once published to NuGet)
 dotnet tool install -g dotnet-prompt
 
 # Verify installation
@@ -46,6 +46,54 @@ Please analyze the current .NET project and provide a comprehensive report inclu
 - Test coverage analysis
 
 Generate documentation and suggest improvements where needed.
+```
+
+2. **Execute the workflow**:
+
+```bash
+# Basic execution
+dotnet prompt run analyze-project.prompt.md
+
+# Dry run (validation only)
+dotnet prompt run analyze-project.prompt.md --dry-run
+
+# With verbose output
+dotnet prompt run analyze-project.prompt.md --verbose
+
+# With custom context and timeout
+dotnet prompt run analyze-project.prompt.md --context ./src --timeout 600
+```
+
+### CLI Commands
+
+```bash
+# Show help
+dotnet prompt --help
+
+# Show version
+dotnet prompt --version
+
+# Run a workflow
+dotnet prompt run <workflow-file> [options]
+
+# Available run options:
+#   --context <path>    Working directory context
+#   --dry-run          Validate workflow without execution
+#   --timeout <secs>   Execution timeout in seconds
+#   --verbose          Enable verbose output
+```
+
+### Environment Variables
+
+```bash
+# Enable verbose logging
+export DOTNET_PROMPT_VERBOSE=true
+
+# Set default timeout
+export DOTNET_PROMPT_TIMEOUT=300
+
+# Disable telemetry
+export DOTNET_PROMPT_NO_TELEMETRY=true
 ```
 
 2. **Execute the workflow**:
@@ -420,6 +468,133 @@ dotnet-prompt is designed for extensibility and community contributions:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔨 How to Build and Test
+
+### Prerequisites
+
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- Git
+
+### Building the Project
+
+```bash
+# Clone the repository
+git clone https://github.com/fbouteruche/dotnet-prompt.git
+cd dotnet-prompt
+
+# Restore dependencies and build all projects
+dotnet build
+
+# Build in Release configuration
+dotnet build --configuration Release
+```
+
+### Running Tests
+
+```bash
+# Run all tests (unit + integration)
+dotnet test
+
+# Run tests with detailed output
+dotnet test --verbosity normal
+
+# Run only unit tests
+dotnet test tests/DotnetPrompt.UnitTests
+
+# Run only integration tests
+dotnet test tests/DotnetPrompt.IntegrationTests
+```
+
+### Local Development and Testing
+
+```bash
+# 1. Build and pack the CLI tool
+dotnet pack src/DotnetPrompt.Cli --configuration Release
+
+# 2. Install the tool locally for testing
+dotnet tool install --global --add-source ./src/DotnetPrompt.Cli/bin/Release DotnetPrompt.Cli
+
+# 3. Verify installation
+dotnet prompt --version
+
+# 4. Test with sample prompts
+dotnet prompt run prompts/hello-world.prompt.md --dry-run
+```
+
+### Updating Local Installation
+
+```bash
+# Uninstall the current version
+dotnet tool uninstall -g DotnetPrompt.Cli
+
+# Rebuild and reinstall
+dotnet pack src/DotnetPrompt.Cli --configuration Release
+dotnet tool install --global --add-source ./src/DotnetPrompt.Cli/bin/Release DotnetPrompt.Cli
+```
+
+### Development Workflow
+
+```bash
+# Make changes to the code
+# ...
+
+# Run tests to ensure changes don't break existing functionality
+dotnet test
+
+# Build and test the CLI locally
+dotnet build --configuration Release
+dotnet pack src/DotnetPrompt.Cli --configuration Release
+
+# Update local installation to test changes
+dotnet tool uninstall -g DotnetPrompt.Cli
+dotnet tool install --global --add-source ./src/DotnetPrompt.Cli/bin/Release DotnetPrompt.Cli
+
+# Test your changes with sample prompts
+dotnet prompt run prompts/hello-world.prompt.md --verbose
+```
+
+### Project Structure
+
+```
+src/
+├── DotnetPrompt.Cli/          # CLI entry point and commands
+├── DotnetPrompt.Core/         # Domain models and interfaces
+├── DotnetPrompt.Application/  # Application services and use cases
+├── DotnetPrompt.Infrastructure/ # External integrations
+└── DotnetPrompt.Shared/       # Shared utilities
+
+tests/
+├── DotnetPrompt.UnitTests/    # Unit tests for core logic
+└── DotnetPrompt.IntegrationTests/ # End-to-end CLI tests
+
+prompts/                       # Sample workflow files for testing
+docs/                         # Comprehensive documentation
+```
+
+### Troubleshooting
+
+**Tool installation issues:**
+```bash
+# Check if tool is already installed
+dotnet tool list -g
+
+# Clear NuGet cache if needed
+dotnet nuget locals all --clear
+
+# Ensure you're using the correct source path
+ls src/DotnetPrompt.Cli/bin/Release/
+```
+
+**Build issues:**
+```bash
+# Clean and rebuild
+dotnet clean
+dotnet build
+
+# Restore packages explicitly
+dotnet restore
+```
 
 ## 🚧 Implementation Roadmap
 
