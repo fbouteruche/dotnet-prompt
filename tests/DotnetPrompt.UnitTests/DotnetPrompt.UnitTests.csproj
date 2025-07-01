@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\DotnetPrompt.Cli\DotnetPrompt.Cli.csproj" />
     <ProjectReference Include="..\..\src\DotnetPrompt.Core\DotnetPrompt.Core.csproj" />
     <ProjectReference Include="..\..\src\DotnetPrompt.Application\DotnetPrompt.Application.csproj" />
+    <ProjectReference Include="..\..\src\DotnetPrompt.Infrastructure\DotnetPrompt.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
