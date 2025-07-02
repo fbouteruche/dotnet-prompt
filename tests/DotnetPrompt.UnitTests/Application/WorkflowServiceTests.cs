@@ -11,13 +11,15 @@ public class WorkflowServiceTests
 {
     private readonly Mock<ILogger<WorkflowService>> _mockLogger;
     private readonly Mock<IDotpromptParser> _mockParser;
+    private readonly Mock<IConfigurationService> _mockConfigurationService;
     private readonly WorkflowService _workflowService;
 
     public WorkflowServiceTests()
     {
         _mockLogger = new Mock<ILogger<WorkflowService>>();
         _mockParser = new Mock<IDotpromptParser>();
-        _workflowService = new WorkflowService(_mockLogger.Object, _mockParser.Object);
+        _mockConfigurationService = new Mock<IConfigurationService>();
+        _workflowService = new WorkflowService(_mockLogger.Object, _mockParser.Object, _mockConfigurationService.Object);
     }
 
     [Fact]

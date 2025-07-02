@@ -76,10 +76,21 @@ public class DotNetPromptConfiguration
             }
         }
         
-        // 2. Override with frontmatter model
+        // 2. Override with frontmatter model (with provider/model parsing)
         if (!string.IsNullOrEmpty(frontmatterModel))
         {
-            config.Model = frontmatterModel;
+            // Parse provider/model format from workflow frontmatter
+            if (frontmatterModel.Contains('/'))
+            {
+                var parts = frontmatterModel.Split('/', 2);
+                config.Provider = parts[0];
+                config.Model = parts[1];
+            }
+            else
+            {
+                // Model only - use configured provider
+                config.Model = frontmatterModel;
+            }
         }
         
         // 1. Override with CLI provider (highest priority)
@@ -183,6 +194,36 @@ public class ProviderConfiguration
     public string? Provider { get; set; } // For local provider type (ollama, etc.)
 }
 ```
+
+### Workflow Frontmatter Model Parsing
+
+When a workflow file specifies a `model` property in its YAML frontmatter, the configuration system supports two formats:
+
+1. **Provider/Model Format**: `model: "provider/model"` - Specifies both provider and model
+2. **Model Only Format**: `model: "model"` - Uses the configured default provider
+
+**Parsing Logic:**
+```csharp
+private static (string? provider, string model) ParseModelSpecification(string modelSpec)
+{
+    if (modelSpec.Contains('/'))
+    {
+        var parts = modelSpec.Split('/', 2);
+        return (parts[0], parts[1]);
+    }
+    return (null, modelSpec);
+}
+```
+
+**Examples:**
+- `model: "github/gpt-4o"` → Provider: "github", Model: "gpt-4o"
+- `model: "openai/gpt-4"` → Provider: "openai", Model: "gpt-4" 
+- `model: "gpt-4o"` → Provider: null (uses configured default), Model: "gpt-4o"
+
+**Precedence Behavior:**
+- Provider/model format overrides both provider and model from lower-precedence sources
+- Model-only format overrides model but preserves configured provider
+- CLI arguments (`--provider`, `--model`) still take highest precedence
 
 ### AI Provider Integration
 

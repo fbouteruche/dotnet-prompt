@@ -16,6 +16,7 @@ public interface IConfigurationService
     /// <param name="cliVerbose">Verbose flag from CLI</param>
     /// <param name="cliConfigFile">Custom config file path from CLI</param>
     /// <param name="projectPath">Project directory path</param>
+    /// <param name="workflowModel">Model specification from workflow frontmatter</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Resolved configuration</returns>
     Task<DotPromptConfiguration> LoadConfigurationAsync(
@@ -24,6 +25,7 @@ public interface IConfigurationService
         bool? cliVerbose = null,
         string? cliConfigFile = null,
         string? projectPath = null,
+        string? workflowModel = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

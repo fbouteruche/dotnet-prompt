@@ -393,11 +393,12 @@ public class ConfigurationServiceTests : IDisposable
         string projectPath,
         string? cliProvider = null,
         string? cliModel = null,
-        bool? cliVerbose = null)
+        bool? cliVerbose = null,
+        string? workflowModel = null)
     {
         var projectDir = Path.GetDirectoryName(projectPath)!;
         var testService = new TestConfigurationService(_mockLogger.Object, globalPath, projectPath);
-        return await testService.LoadConfigurationAsync(cliProvider, cliModel, cliVerbose, null, projectDir);
+        return await testService.LoadConfigurationAsync(cliProvider, cliModel, cliVerbose, null, projectDir, workflowModel);
     }
 
     /// <summary>
@@ -424,5 +425,72 @@ public class ConfigurationServiceTests : IDisposable
         {
             return _projectConfigPath ?? base.GetProjectConfigurationPath(projectPath);
         }
+    }
+
+    [Fact]
+    public async Task LoadConfigurationAsync_WithWorkflowModelProviderSlash_ParsesProviderAndModel()
+    {
+        // Arrange
+        var workflowModel = "github/gpt-4o";
+
+        // Act
+        var result = await _configurationService.LoadConfigurationAsync(
+            workflowModel: workflowModel);
+
+        // Assert
+        result.DefaultProvider.Should().Be("github");
+        result.DefaultModel.Should().Be("gpt-4o");
+    }
+
+    [Fact]
+    public async Task LoadConfigurationAsync_WithWorkflowModelOnly_PreservesProviderOverridesModel()
+    {
+        // Arrange
+        await File.WriteAllTextAsync(_globalConfigPath, @"
+default_provider: azure
+default_model: gpt-35-turbo
+");
+        var workflowModel = "gpt-4";
+
+        // Act
+        var result = await LoadConfigurationWithCustomPaths(_globalConfigPath, _projectConfigPath, workflowModel: workflowModel);
+
+        // Assert
+        result.DefaultProvider.Should().Be("azure"); // Preserved from config
+        result.DefaultModel.Should().Be("gpt-4"); // Overridden by workflow
+    }
+
+    [Fact]
+    public async Task LoadConfigurationAsync_WorkflowModelVsCliPrecedence_CliWins()
+    {
+        // Arrange
+        var workflowModel = "github/gpt-4o";
+        var cliProvider = "openai";
+        var cliModel = "gpt-3.5-turbo";
+
+        // Act
+        var result = await _configurationService.LoadConfigurationAsync(
+            cliProvider: cliProvider,
+            cliModel: cliModel,
+            workflowModel: workflowModel);
+
+        // Assert
+        result.DefaultProvider.Should().Be("openai"); // CLI wins
+        result.DefaultModel.Should().Be("gpt-3.5-turbo"); // CLI wins
+    }
+
+    [Fact]
+    public async Task LoadConfigurationAsync_WorkflowModelWithMultipleSlashes_TakesTwoPartsOnly()
+    {
+        // Arrange
+        var workflowModel = "azure/deployment/gpt-4";
+
+        // Act
+        var result = await _configurationService.LoadConfigurationAsync(
+            workflowModel: workflowModel);
+
+        // Assert
+        result.DefaultProvider.Should().Be("azure");
+        result.DefaultModel.Should().Be("deployment/gpt-4"); // Everything after first slash
     }
 }
