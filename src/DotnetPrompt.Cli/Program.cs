@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.Reflection;
+using DotnetPrompt.Application;
 using DotnetPrompt.Application.Services;
 using DotnetPrompt.Cli.Commands;
 using DotnetPrompt.Core;
@@ -66,6 +67,9 @@ public class Program
 
         // Register application services
         services.AddScoped<IWorkflowService, WorkflowService>();
+        
+        // Register workflow execution services
+        services.AddWorkflowExecutionServices();
 
         // Register parsing services
         services.AddScoped<IDotpromptParser, DotpromptParser>();
