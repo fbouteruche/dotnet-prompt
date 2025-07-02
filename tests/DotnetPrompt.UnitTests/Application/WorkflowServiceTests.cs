@@ -12,6 +12,7 @@ public class WorkflowServiceTests
     private readonly Mock<ILogger<WorkflowService>> _mockLogger;
     private readonly Mock<IDotpromptParser> _mockParser;
     private readonly Mock<IConfigurationService> _mockConfigurationService;
+    private readonly Mock<IWorkflowEngine> _mockWorkflowEngine;
     private readonly WorkflowService _workflowService;
 
     public WorkflowServiceTests()
@@ -19,7 +20,8 @@ public class WorkflowServiceTests
         _mockLogger = new Mock<ILogger<WorkflowService>>();
         _mockParser = new Mock<IDotpromptParser>();
         _mockConfigurationService = new Mock<IConfigurationService>();
-        _workflowService = new WorkflowService(_mockLogger.Object, _mockParser.Object, _mockConfigurationService.Object);
+        _mockWorkflowEngine = new Mock<IWorkflowEngine>();
+        _workflowService = new WorkflowService(_mockLogger.Object, _mockParser.Object, _mockConfigurationService.Object, _mockWorkflowEngine.Object);
     }
 
     [Fact]
@@ -87,8 +89,21 @@ public class WorkflowServiceTests
         var validWorkflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
         await File.WriteAllTextAsync(validWorkflowFile, "# Valid workflow content");
 
+        var mockWorkflow = new DotpromptWorkflow
+        {
+            Name = "test-workflow",
+            FilePath = validWorkflowFile,
+            Content = new WorkflowContent { RawMarkdown = "# Valid workflow content" }
+        };
+
         _mockParser.Setup(p => p.ValidateFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
                    .ReturnsAsync(DotpromptValidationResult.Valid());
+        
+        _mockParser.Setup(p => p.ParseFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(mockWorkflow);
+
+        _mockWorkflowEngine.Setup(e => e.ValidateAsync(It.IsAny<DotpromptWorkflow>(), It.IsAny<WorkflowExecutionContext>(), It.IsAny<CancellationToken>()))
+                           .ReturnsAsync(WorkflowValidationResult.Valid);
 
         try
         {
@@ -131,8 +146,21 @@ public class WorkflowServiceTests
         await File.WriteAllTextAsync(validWorkflowFile, "# Valid workflow content");
         var options = new WorkflowExecutionOptions(DryRun: true);
 
+        var mockWorkflow = new DotpromptWorkflow
+        {
+            Name = "test-workflow",
+            FilePath = validWorkflowFile,
+            Content = new WorkflowContent { RawMarkdown = "# Valid workflow content" }
+        };
+
         _mockParser.Setup(p => p.ValidateFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
                    .ReturnsAsync(DotpromptValidationResult.Valid());
+        
+        _mockParser.Setup(p => p.ParseFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(mockWorkflow);
+
+        _mockWorkflowEngine.Setup(e => e.ValidateAsync(It.IsAny<DotpromptWorkflow>(), It.IsAny<WorkflowExecutionContext>(), It.IsAny<CancellationToken>()))
+                           .ReturnsAsync(WorkflowValidationResult.Valid);
 
         try
         {
@@ -168,6 +196,9 @@ public class WorkflowServiceTests
         _mockParser.Setup(p => p.ParseFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
                    .ReturnsAsync(mockWorkflow);
 
+        _mockWorkflowEngine.Setup(e => e.ExecuteAsync(It.IsAny<DotpromptWorkflow>(), It.IsAny<WorkflowExecutionContext>(), It.IsAny<CancellationToken>()))
+                           .ReturnsAsync(new WorkflowExecutionResult(true, "Workflow executed successfully"));
+
         try
         {
             // Act
@@ -175,7 +206,7 @@ public class WorkflowServiceTests
 
             // Assert
             Assert.True(result.Success);
-            Assert.Contains("CLI foundation established", result.Output ?? string.Empty);
+            Assert.Contains("executed successfully", result.Output ?? string.Empty);
         }
         finally
         {
