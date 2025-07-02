@@ -11,11 +11,13 @@ public class WorkflowService : IWorkflowService
 {
     private readonly ILogger<WorkflowService> _logger;
     private readonly IDotpromptParser _parser;
+    private readonly IConfigurationService _configurationService;
 
-    public WorkflowService(ILogger<WorkflowService> logger, IDotpromptParser parser)
+    public WorkflowService(ILogger<WorkflowService> logger, IDotpromptParser parser, IConfigurationService configurationService)
     {
         _logger = logger;
         _parser = parser;
+        _configurationService = configurationService;
     }
 
     public async Task<WorkflowExecutionResult> ExecuteAsync(string workflowFilePath, WorkflowExecutionOptions options, CancellationToken cancellationToken = default)
@@ -35,6 +37,15 @@ public class WorkflowService : IWorkflowService
 
             // Parse the workflow to validate it can be loaded
             var workflow = await _parser.ParseFileAsync(workflowFilePath, cancellationToken);
+            
+            // TODO: When workflow execution is implemented, use this pattern to integrate workflow model with configuration:
+            // var projectPath = Path.GetDirectoryName(workflowFilePath);
+            // var config = await _configurationService.LoadConfigurationAsync(
+            //     cliProvider: options.Provider,
+            //     cliModel: options.Model,
+            //     projectPath: projectPath,
+            //     workflowModel: workflow.Model,  // This integrates the parsed model from frontmatter
+            //     cancellationToken: cancellationToken);
             
             // TODO: Implement actual workflow execution in future tasks
             _logger.LogWarning("Workflow execution not yet implemented - this is the CLI foundation MVP");

@@ -33,10 +33,11 @@ public class ConfigurationService : IConfigurationService
         bool? cliVerbose = null,
         string? cliConfigFile = null,
         string? projectPath = null,
+        string? workflowModel = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Loading configuration with CLI overrides: Provider={Provider}, Model={Model}, Verbose={Verbose}",
-            cliProvider, cliModel, cliVerbose);
+        _logger.LogDebug("Loading configuration with CLI overrides: Provider={Provider}, Model={Model}, Verbose={Verbose}, WorkflowModel={WorkflowModel}",
+            cliProvider, cliModel, cliVerbose, workflowModel);
 
         var configBuilder = new ConfigurationBuilder();
 
@@ -67,6 +68,9 @@ public class ConfigurationService : IConfigurationService
 
         // Apply configuration from files
         BindConfigurationToModel(configuration, dotPromptConfig);
+
+        // Apply workflow frontmatter model override (before CLI overrides)
+        ApplyWorkflowModelOverride(dotPromptConfig, workflowModel);
 
         // Apply CLI overrides (highest priority)
         ApplyCliOverrides(dotPromptConfig, cliProvider, cliModel, cliVerbose);
@@ -247,6 +251,25 @@ public class ConfigurationService : IConfigurationService
         {
             // Store as generic objects for now - tools will deserialize as needed
             dotPromptConfig.ToolConfiguration[toolSection.Key] = toolSection.Value ?? string.Empty;
+        }
+    }
+
+    private static void ApplyWorkflowModelOverride(DotPromptConfiguration config, string? workflowModel)
+    {
+        if (string.IsNullOrEmpty(workflowModel))
+            return;
+
+        // Parse provider/model format from workflow frontmatter
+        if (workflowModel.Contains('/'))
+        {
+            var parts = workflowModel.Split('/', 2);
+            config.DefaultProvider = parts[0];
+            config.DefaultModel = parts[1];
+        }
+        else
+        {
+            // Model only - use configured provider, only override model
+            config.DefaultModel = workflowModel;
         }
     }
 

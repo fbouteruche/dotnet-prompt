@@ -8,9 +8,36 @@ Configuration values are resolved in the following order (highest to lowest prec
 
 1. **CLI Arguments** - `--provider`, `--model`, `--verbose`, etc.
 2. **Environment Variables** - `DOTNET_PROMPT_*` prefixed variables
-3. **Project Configuration** - `./dotnet-prompt.yaml` in current directory
-4. **Global Configuration** - `~/.dotnet-prompt/config.yaml` in user profile
-5. **Default Values** - Built-in sensible defaults
+3. **Workflow Frontmatter** - `model` and other properties in `.prompt.md` YAML frontmatter
+4. **Project Configuration** - `./dotnet-prompt.yaml` in current directory
+5. **Global Configuration** - `~/.dotnet-prompt/config.yaml` in user profile
+6. **Default Values** - Built-in sensible defaults
+
+### Model Provider Specification in Workflow Files
+
+When you specify the `model` property in a workflow file's YAML frontmatter, you can use two formats:
+
+1. **Provider/Model Format**: `model: "provider/model"` - Specifies both provider and model
+2. **Model Only Format**: `model: "model"` - Uses configured default provider
+
+**Examples:**
+```yaml
+---
+# Explicit provider/model specification (overrides all configuration)
+model: "github/gpt-4o"        # Use GitHub Models provider with gpt-4o
+model: "openai/gpt-4"         # Use OpenAI provider with gpt-4
+model: "azure/gpt-35-turbo"   # Use Azure OpenAI with gpt-35-turbo
+model: "local/llama2"         # Use local Ollama with llama2
+
+# Model only (uses default_provider from configuration)
+model: "gpt-4o"               # Use configured provider with gpt-4o
+---
+```
+
+**Resolution Behavior:**
+- If `model` contains a `/`, it's parsed as `provider/model` and overrides both provider and model settings
+- If `model` contains no `/`, it's treated as just the model name and uses the configured `default_provider`
+- Frontmatter model specification takes precedence over project/global configuration but can be overridden by CLI arguments
 
 ## Configuration Files
 
@@ -150,6 +177,39 @@ dotnet-prompt config set default_provider github --global
 
 ## Examples
 
+### Model Provider Override in Workflow Files
+
+**Scenario 1: Override both provider and model**
+```yaml
+# Global config: default_provider: "openai", default_model: "gpt-3.5-turbo"
+# Workflow frontmatter:
+---
+name: "analysis-workflow"
+model: "github/gpt-4o"  # Overrides to use GitHub Models with gpt-4o
+tools: ["project-analysis"]
+---
+```
+Result: Uses GitHub Models provider with gpt-4o model, ignoring global configuration.
+
+**Scenario 2: Override model only, keep configured provider**
+```yaml
+# Global config: default_provider: "azure", default_model: "gpt-35-turbo"
+# Workflow frontmatter:
+---
+name: "code-review"
+model: "gpt-4"  # No slash, so uses configured provider (azure) with gpt-4
+---
+```
+Result: Uses Azure OpenAI provider with gpt-4 model.
+
+**Scenario 3: CLI override wins**
+```bash
+# Workflow has: model: "github/gpt-4o"
+# CLI command:
+dotnet prompt run workflow.prompt.md --provider openai --model gpt-3.5-turbo
+```
+Result: Uses OpenAI provider with gpt-3.5-turbo, overriding the workflow frontmatter.
+
 ### Minimal Configuration
 
 ```yaml
@@ -249,3 +309,44 @@ Warnings:
 3. **Validate regularly** - Run `config validate` as part of CI/CD
 4. **Use structured logging in CI** - Set `logging.structured: true` for automated environments
 5. **Cache in project directories** - Use relative paths for `cache_directory` in project configs
+6. **Specify providers explicitly in workflows** - Use `provider/model` format for reproducible results across different environments
+
+## Troubleshooting
+
+### Common Model Provider Issues
+
+**Issue**: Workflow fails with "Unknown provider" error
+```
+Error: Unknown provider: github
+```
+**Solution**: Check that the provider is configured in your configuration file:
+```yaml
+providers:
+  github:
+    token: "${GITHUB_TOKEN}"
+    base_url: "https://models.inference.ai.azure.com"
+```
+
+**Issue**: Model not found error
+```
+Error: Model 'gpt-5' not found for provider 'openai'
+```
+**Solution**: Verify the model name is correct for the provider. Use `dotnet prompt config show --effective` to see resolved configuration.
+
+**Issue**: Authentication failure
+```
+Error: Authentication failed for provider 'azure'
+```
+**Solution**: Check that environment variables are set correctly and that API keys/tokens are valid:
+```bash
+echo $AZURE_OPENAI_API_KEY  # Should show your key
+echo $AZURE_OPENAI_ENDPOINT # Should show your endpoint
+```
+
+**Issue**: Workflow uses wrong provider
+**Solution**: Check the precedence order. CLI arguments override workflow frontmatter:
+1. CLI: `--provider openai --model gpt-4`
+2. Workflow: `model: "github/gpt-4o"`
+3. Project config: `default_provider: "azure"`
+
+Use `dotnet prompt run workflow.prompt.md --dry-run --verbose` to see which configuration will be used.
