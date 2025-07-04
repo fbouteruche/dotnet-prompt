@@ -41,9 +41,9 @@ public class WorkflowExecutionFilter : IFunctionInvocationFilter
                 pluginName, functionName, stopwatch.ElapsedMilliseconds);
             
             // Log result (truncated for safety)
-            if (context.Result.Value != null)
+            if (context.Result != null)
             {
-                var resultValue = context.Result.Value.ToString();
+                var resultValue = context.Result.ToString();
                 var truncatedResult = resultValue?.Length > 200 ? resultValue.Substring(0, 200) + "..." : resultValue;
                 _logger.LogDebug("SK Function result: {Result}", truncatedResult);
             }

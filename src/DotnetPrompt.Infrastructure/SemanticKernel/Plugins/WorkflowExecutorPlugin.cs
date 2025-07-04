@@ -179,8 +179,7 @@ public class WorkflowExecutorPlugin
         return new WorkflowExecutionContext
         {
             Variables = variables,
-            WorkflowId = Guid.NewGuid().ToString(),
-            StartTime = DateTimeOffset.UtcNow
+            StartTime = DateTime.UtcNow
         };
     }
 

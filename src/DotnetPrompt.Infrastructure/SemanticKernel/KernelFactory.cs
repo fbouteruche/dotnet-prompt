@@ -140,10 +140,12 @@ public class KernelFactory : IKernelFactory
         var model = GetConfigValue(config, "Model") ?? _configuration["AI:GitHub:Model"] ?? "gpt-4o";
 
         // GitHub Models uses OpenAI-compatible API
+        #pragma warning disable SKEXP0010
         builder.AddOpenAIChatCompletion(
             modelId: model,
             apiKey: token,
             endpoint: new Uri("https://models.inference.ai.azure.com"));
+        #pragma warning restore SKEXP0010
     }
 
     private void ConfigureAzureOpenAI(IKernelBuilder builder, Dictionary<string, object>? config)
@@ -162,8 +164,7 @@ public class KernelFactory : IKernelFactory
         }
         else
         {
-            // Use Azure Identity for authentication
-            builder.AddAzureOpenAIChatCompletion(model, endpoint);
+            throw new InvalidOperationException("Azure OpenAI API key is required");
         }
     }
 
