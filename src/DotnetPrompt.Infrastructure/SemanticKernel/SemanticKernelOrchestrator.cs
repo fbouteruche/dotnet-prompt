@@ -39,12 +39,11 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
             _logger.LogInformation("Starting SK-powered workflow execution: {WorkflowName}", workflow.Name ?? "unnamed");
             
             // Get or create kernel with required plugins
-            _kernel ??= await _kernelFactory.CreateKernelAsync(
-                context.Configuration?.Provider, 
-                context.Configuration?.ProviderSettings);
+            _kernel ??= await _kernelFactory.CreateKernelAsync();
 
             // Load conversation history for resume capability
-            var chatHistory = await GetChatHistoryAsync(context.WorkflowId ?? Guid.NewGuid().ToString());
+            var workflowId = $"workflow_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+            var chatHistory = await GetChatHistoryAsync(workflowId);
 
             // Execute workflow using SK's automatic function calling
             var executionSettings = CreateExecutionSettings(workflow, context);
@@ -70,23 +69,16 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
             chatHistory.Add(response);
 
             // Save conversation state for resume capability
-            await SaveChatHistoryAsync(context.WorkflowId ?? Guid.NewGuid().ToString(), chatHistory);
+            await SaveChatHistoryAsync(workflowId, chatHistory);
 
             _logger.LogInformation("SK workflow execution completed successfully in {Duration}ms", 
                 executionStopwatch.ElapsedMilliseconds);
 
             return new WorkflowExecutionResult(
                 Success: true,
-                Result: response.Content ?? "Workflow completed successfully",
+                Output: response.Content ?? "Workflow completed successfully",
                 ErrorMessage: null,
-                ExecutionTime: executionStopwatch.Elapsed,
-                Metadata: new Dictionary<string, object>
-                {
-                    { "sk_execution", true },
-                    { "function_calls_count", CountFunctionCalls(chatHistory) },
-                    { "conversation_length", chatHistory.Count },
-                    { "provider", context.Configuration?.Provider ?? "default" }
-                });
+                ExecutionTime: executionStopwatch.Elapsed);
         }
         catch (Exception ex)
         {
@@ -94,7 +86,7 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
             
             return new WorkflowExecutionResult(
                 Success: false,
-                Result: null,
+                Output: null,
                 ErrorMessage: $"SK execution failed: {ex.Message}",
                 ExecutionTime: executionStopwatch.Elapsed);
         }
@@ -114,21 +106,19 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
             _logger.LogInformation("Validating workflow with SK: {WorkflowName}", workflow.Name ?? "unnamed");
 
             // Get kernel for validation
-            _kernel ??= await _kernelFactory.CreateKernelAsync(
-                context.Configuration?.Provider, 
-                context.Configuration?.ProviderSettings);
+            _kernel ??= await _kernelFactory.CreateKernelAsync();
 
             var errors = new List<string>();
             var warnings = new List<string>();
 
             // Validate workflow structure
-            if (string.IsNullOrEmpty(workflow.Content))
+            if (string.IsNullOrEmpty(workflow.Content?.RawMarkdown))
             {
                 errors.Add("Workflow content cannot be empty");
             }
 
             // Validate frontmatter configuration
-            if (workflow.Frontmatter?.ContainsKey("model") != true)
+            if (string.IsNullOrEmpty(workflow.Model))
             {
                 warnings.Add("No model specified in frontmatter, will use default");
             }
@@ -148,13 +138,7 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
             return new WorkflowValidationResult(
                 IsValid: isValid,
                 Errors: errors.ToArray(),
-                Warnings: warnings.Count > 0 ? warnings.ToArray() : null,
-                Metadata: new Dictionary<string, object>
-                {
-                    { "sk_validation", true },
-                    { "available_functions", availableFunctions.Count() },
-                    { "provider", context.Configuration?.Provider ?? "default" }
-                });
+                Warnings: warnings.Count > 0 ? warnings.ToArray() : null);
         }
         catch (Exception ex)
         {
@@ -196,8 +180,8 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
         var settings = new OpenAIPromptExecutionSettings
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(), // Enable automatic function calling
-            MaxTokens = GetConfigValue<int?>(workflow.Frontmatter, "max_tokens") ?? 4000,
-            Temperature = GetConfigValue<double?>(workflow.Frontmatter, "temperature") ?? 0.7
+            MaxTokens = workflow.Config?.MaxOutputTokens ?? 4000,
+            Temperature = workflow.Config?.Temperature ?? 0.7
         };
 
         return settings;
@@ -214,7 +198,7 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
             {string.Join("\n", context.Variables.Select(kv => $"- {kv.Key}: {kv.Value}"))}
 
             Workflow Content:
-            {workflow.Content}
+            {workflow.Content?.RawMarkdown}
 
             Please execute this workflow using the available functions. Use file operations for reading/writing files, 
             and ensure all variable substitutions are properly resolved.
@@ -226,7 +210,7 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
     private static int ExtractStepCount(DotpromptWorkflow workflow)
     {
         // Simple heuristic - count logical steps mentioned in content
-        return workflow.Content?.Split('\n')
+        return workflow.Content?.RawMarkdown?.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Count(line => line.TrimStart().StartsWith("- ") || 
                           line.TrimStart().StartsWith("1.") ||
                           line.TrimStart().StartsWith("2.") ||
@@ -237,21 +221,5 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
     {
         // Count function calls in the conversation
         return chatHistory.Count(message => message.Role == AuthorRole.Tool);
-    }
-
-    private static T? GetConfigValue<T>(Dictionary<string, object>? frontmatter, string key)
-    {
-        if (frontmatter?.TryGetValue(key, out var value) == true)
-        {
-            try
-            {
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
-            {
-                return default;
-            }
-        }
-        return default;
     }
 }

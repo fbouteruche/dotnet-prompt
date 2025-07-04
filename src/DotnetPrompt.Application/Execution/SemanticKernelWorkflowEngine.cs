@@ -46,7 +46,7 @@ public class SemanticKernelWorkflowEngine : IWorkflowEngine
             
             return new WorkflowExecutionResult(
                 Success: false,
-                Result: null,
+                Output: null,
                 ErrorMessage: $"SK workflow execution failed: {ex.Message}",
                 ExecutionTime: stopwatch.Elapsed);
         }
