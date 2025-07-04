@@ -38,6 +38,11 @@ public class WorkflowExecutionContext
     public string WorkingDirectory { get; set; } = Environment.CurrentDirectory;
 
     /// <summary>
+    /// Whether advanced validation requiring AI provider connectivity is needed
+    /// </summary>
+    public bool RequireAdvancedValidation { get; set; } = false;
+
+    /// <summary>
     /// Gets a variable value with type conversion
     /// </summary>
     /// <typeparam name="T">Type to convert to</typeparam>
@@ -90,7 +95,8 @@ public class WorkflowExecutionContext
             ExecutionHistory = new List<StepExecutionHistory>(ExecutionHistory),
             CurrentStep = CurrentStep,
             StartTime = StartTime,
-            WorkingDirectory = WorkingDirectory
+            WorkingDirectory = WorkingDirectory,
+            RequireAdvancedValidation = RequireAdvancedValidation
         };
     }
 }
