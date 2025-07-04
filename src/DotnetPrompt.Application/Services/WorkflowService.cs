@@ -1,23 +1,30 @@
 ﻿using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Models;
 using DotnetPrompt.Core.Parsing;
 using Microsoft.Extensions.Logging;
 
 namespace DotnetPrompt.Application.Services;
 
 /// <summary>
-/// Basic implementation of workflow service for MVP
+/// Implementation of workflow service using the workflow execution engine
 /// </summary>
 public class WorkflowService : IWorkflowService
 {
     private readonly ILogger<WorkflowService> _logger;
     private readonly IDotpromptParser _parser;
     private readonly IConfigurationService _configurationService;
+    private readonly IWorkflowEngine _workflowEngine;
 
-    public WorkflowService(ILogger<WorkflowService> logger, IDotpromptParser parser, IConfigurationService configurationService)
+    public WorkflowService(
+        ILogger<WorkflowService> logger, 
+        IDotpromptParser parser, 
+        IConfigurationService configurationService,
+        IWorkflowEngine workflowEngine)
     {
         _logger = logger;
         _parser = parser;
         _configurationService = configurationService;
+        _workflowEngine = workflowEngine;
     }
 
     public async Task<WorkflowExecutionResult> ExecuteAsync(string workflowFilePath, WorkflowExecutionOptions options, CancellationToken cancellationToken = default)
@@ -35,22 +42,29 @@ public class WorkflowService : IWorkflowService
                     validationResult.IsValid ? null : string.Join(", ", validationResult.Errors ?? Array.Empty<string>()));
             }
 
-            // Parse the workflow to validate it can be loaded
+            // Parse the workflow
             var workflow = await _parser.ParseFileAsync(workflowFilePath, cancellationToken);
             
-            // TODO: When workflow execution is implemented, use this pattern to integrate workflow model with configuration:
-            // var projectPath = Path.GetDirectoryName(workflowFilePath);
-            // var config = await _configurationService.LoadConfigurationAsync(
-            //     cliProvider: options.Provider,
-            //     cliModel: options.Model,
-            //     projectPath: projectPath,
-            //     workflowModel: workflow.Model,  // This integrates the parsed model from frontmatter
-            //     cancellationToken: cancellationToken);
+            // Create execution context
+            var context = new WorkflowExecutionContext
+            {
+                Options = options,
+                WorkingDirectory = Path.GetDirectoryName(workflowFilePath) ?? Environment.CurrentDirectory
+            };
+
+            // Set any context variables from options if needed
+            if (!string.IsNullOrEmpty(options.Context))
+            {
+                context.SetVariable("context", options.Context);
+            }
+
+            // Execute the workflow using the engine
+            var result = await _workflowEngine.ExecuteAsync(workflow, context, cancellationToken);
             
-            // TODO: Implement actual workflow execution in future tasks
-            _logger.LogWarning("Workflow execution not yet implemented - this is the CLI foundation MVP");
-            
-            return new WorkflowExecutionResult(true, "CLI foundation established - workflow execution will be implemented in future tasks");
+            _logger.LogInformation("Workflow execution completed. Success: {Success}, Duration: {Duration}ms", 
+                result.Success, result.ExecutionTime.TotalMilliseconds);
+
+            return result;
         }
         catch (DotpromptParseException ex)
         {
@@ -70,27 +84,41 @@ public class WorkflowService : IWorkflowService
         
         try
         {
-            var dotpromptResult = await _parser.ValidateFileAsync(workflowFilePath, cancellationToken);
+            // First validate using the parser
+            var parserValidation = await _parser.ValidateFileAsync(workflowFilePath, cancellationToken);
             
-            if (dotpromptResult.IsValid)
+            if (!parserValidation.IsValid)
             {
-                _logger.LogInformation("Workflow validation passed for: {WorkflowFilePath}", workflowFilePath);
-                return WorkflowValidationResult.Valid;
+                var errors = parserValidation.Errors.Select(e => e.Message).ToArray();
+                var warnings = parserValidation.Warnings.Select(w => w.Message).ToArray();
+                return new WorkflowValidationResult(false, errors, warnings);
             }
 
-            // Convert dotprompt validation errors to workflow validation errors
-            var errors = dotpromptResult.Errors.Select(e => e.Message).ToArray();
-            var warnings = dotpromptResult.Warnings.Select(w => w.Message).ToArray();
+            // Parse the workflow for execution validation
+            var workflow = await _parser.ParseFileAsync(workflowFilePath, cancellationToken);
             
-            _logger.LogWarning("Workflow validation failed for: {WorkflowFilePath}. Errors: {Errors}", 
-                workflowFilePath, string.Join("; ", errors));
-                
-            return new WorkflowValidationResult(false, errors, warnings);
+            // Create execution context for validation
+            var context = new WorkflowExecutionContext
+            {
+                WorkingDirectory = Path.GetDirectoryName(workflowFilePath) ?? Environment.CurrentDirectory
+            };
+
+            // Validate using the workflow engine
+            var engineValidation = await _workflowEngine.ValidateAsync(workflow, context, cancellationToken);
+            
+            _logger.LogInformation("Workflow validation completed. Valid: {IsValid}", engineValidation.IsValid);
+            
+            return engineValidation;
+        }
+        catch (DotpromptParseException ex)
+        {
+            _logger.LogError(ex, "Error parsing workflow file: {WorkflowFilePath}", workflowFilePath);
+            return new WorkflowValidationResult(false, new[] { ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating workflow file: {WorkflowFilePath}", workflowFilePath);
-            return new WorkflowValidationResult(false, new[] { $"Error validating workflow file: {ex.Message}" });
+            _logger.LogError(ex, "Unexpected error validating workflow: {WorkflowFilePath}", workflowFilePath);
+            return new WorkflowValidationResult(false, new[] { ex.Message });
         }
     }
 }

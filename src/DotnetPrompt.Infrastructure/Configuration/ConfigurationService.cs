@@ -84,7 +84,7 @@ public class ConfigurationService : IConfigurationService
         _logger.LogDebug("Configuration loaded successfully. Provider={Provider}, Model={Model}",
             dotPromptConfig.DefaultProvider, dotPromptConfig.DefaultModel);
 
-        return dotPromptConfig;
+        return await Task.FromResult(dotPromptConfig);
     }
 
     public ConfigurationValidationResult ValidateConfiguration(DotPromptConfiguration configuration)

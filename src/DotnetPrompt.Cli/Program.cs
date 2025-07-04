@@ -1,11 +1,13 @@
 ﻿using System.CommandLine;
 using System.Reflection;
+using DotnetPrompt.Application;
 using DotnetPrompt.Application.Services;
 using DotnetPrompt.Cli.Commands;
 using DotnetPrompt.Core;
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Parsing;
 using DotnetPrompt.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -47,6 +49,16 @@ public class Program
     {
         var services = new ServiceCollection();
 
+        // Build configuration first
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        // Register configuration as singleton
+        services.AddSingleton<IConfiguration>(configuration);
+
         // Configure logging
         services.AddLogging(builder =>
         {
@@ -66,12 +78,15 @@ public class Program
 
         // Register application services
         services.AddScoped<IWorkflowService, WorkflowService>();
+        
+        // Register workflow execution services (SK-powered)
+        services.AddWorkflowExecutionServices();
 
         // Register parsing services
         services.AddScoped<IDotpromptParser, DotpromptParser>();
 
-        // Register configuration services
-        services.AddConfigurationServices();
+        // Register infrastructure services (including Semantic Kernel)
+        services.AddInfrastructureServices();
 
         // Register commands
         services.AddScoped<RunCommand>();
