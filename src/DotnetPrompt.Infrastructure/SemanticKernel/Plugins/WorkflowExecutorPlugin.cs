@@ -24,7 +24,7 @@ public class WorkflowExecutorPlugin
     [KernelFunction("execute_prompt")]
     [Description("Executes an AI prompt with variable substitution and returns the result")]
     [return: Description("The AI response to the prompt")]
-    public async Task<string> ExecutePromptAsync(
+    public Task<string> ExecutePromptAsync(
         [Description("The prompt content to execute")] string prompt,
         [Description("JSON object containing variables for substitution")] string variables = "{}",
         [Description("Model configuration settings as JSON")] string modelConfig = "{}",
@@ -59,12 +59,12 @@ public class WorkflowExecutorPlugin
 
             _logger.LogInformation("Prompt execution completed via SK in {Duration}ms", stopwatch.ElapsedMilliseconds);
             
-            return response;
+            return Task.FromResult(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing prompt via SK function");
-            throw new KernelException($"Prompt execution failed: {ex.Message}", ex);
+            return Task.FromException<string>(new KernelException($"Prompt execution failed: {ex.Message}", ex));
         }
         finally
         {
@@ -80,6 +80,7 @@ public class WorkflowExecutorPlugin
         [Description("JSON object containing available variables")] string variables = "{}",
         CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask; // Async compliance for SK function
         try
         {
             _logger.LogInformation("Validating variables via SK function");
@@ -104,8 +105,6 @@ public class WorkflowExecutorPlugin
             _logger.LogError(ex, "Error validating variables via SK function");
             throw new KernelException($"Variable validation failed: {ex.Message}", ex);
         }
-        
-        await Task.CompletedTask;
     }
 
     [KernelFunction("extract_workflow_steps")]
@@ -116,6 +115,7 @@ public class WorkflowExecutorPlugin
         [Description("JSON object containing variables for step resolution")] string variables = "{}",
         CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask; // Async compliance for SK function
         try
         {
             _logger.LogInformation("Extracting workflow steps via SK function");
@@ -152,8 +152,6 @@ public class WorkflowExecutorPlugin
             _logger.LogError(ex, "Error extracting workflow steps via SK function");
             throw new KernelException($"Step extraction failed: {ex.Message}", ex);
         }
-        
-        await Task.CompletedTask;
     }
 
     private WorkflowExecutionContext CreateExecutionContext(string variablesJson)

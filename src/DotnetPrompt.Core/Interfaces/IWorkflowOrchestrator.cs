@@ -3,12 +3,12 @@ using DotnetPrompt.Core.Models;
 namespace DotnetPrompt.Core.Interfaces;
 
 /// <summary>
-/// Semantic Kernel orchestrator interface (defined in Core but implemented in Infrastructure)
+/// AI-powered workflow orchestrator interface (framework-agnostic)
 /// </summary>
-public interface ISemanticKernelOrchestrator
+public interface IWorkflowOrchestrator
 {
     /// <summary>
-    /// Executes a workflow using Semantic Kernel's function calling and planning capabilities
+    /// Executes a workflow using AI orchestration capabilities
     /// </summary>
     /// <param name="workflow">The workflow to execute</param>
     /// <param name="context">Execution context with variables and settings</param>
@@ -17,7 +17,7 @@ public interface ISemanticKernelOrchestrator
     Task<WorkflowExecutionResult> ExecuteWorkflowAsync(DotpromptWorkflow workflow, WorkflowExecutionContext context, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Validates a workflow using SK's built-in validation capabilities
+    /// Validates a workflow using AI-powered validation capabilities
     /// </summary>
     /// <param name="workflow">The workflow to validate</param>
     /// <param name="context">Execution context for validation</param>

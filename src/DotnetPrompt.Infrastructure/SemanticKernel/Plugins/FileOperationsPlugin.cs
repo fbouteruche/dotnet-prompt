@@ -127,6 +127,7 @@ public class FileOperationsPlugin
         [Description("The absolute or relative path to check")] string filePath,
         CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask; // Async compliance for SK function
         try
         {
             _logger.LogDebug("Checking file existence via SK function: {FilePath}", filePath);
@@ -143,8 +144,6 @@ public class FileOperationsPlugin
             _logger.LogError(ex, "Error checking file existence {FilePath} via SK function", filePath);
             return false;
         }
-        
-        await Task.CompletedTask;
     }
 
     [KernelFunction("get_file_info")]
@@ -154,6 +153,7 @@ public class FileOperationsPlugin
         [Description("The absolute or relative path to the file")] string filePath,
         CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask; // Async compliance for SK function
         try
         {
             _logger.LogDebug("Getting file info via SK function: {FilePath}", filePath);
@@ -189,8 +189,6 @@ public class FileOperationsPlugin
             _logger.LogError(ex, "Error getting file info {FilePath} via SK function", filePath);
             throw new KernelException($"Get file info failed: {ex.Message}", ex);
         }
-        
-        await Task.CompletedTask;
     }
 
     private string ValidateAndResolvePath(string filePath)

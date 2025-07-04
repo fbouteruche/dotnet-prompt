@@ -17,13 +17,13 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddWorkflowExecutionServices(this IServiceCollection services)
     {
-        // Register the SK-powered workflow engine as the primary implementation
-        services.AddScoped<IWorkflowEngine, SemanticKernelWorkflowEngine>();
+        // Register the AI-powered workflow engine as the primary implementation
+        services.AddScoped<IWorkflowEngine, AiWorkflowEngine>();
         
         // Keep the original engine available for fallback if needed
         services.AddScoped<WorkflowEngine>();
         
-        // Register variable resolver (still needed by SK plugins)
+        // Register variable resolver (still needed by custom step executors)
         services.AddScoped<IVariableResolver, VariableResolver>();
         
         // Keep step executors for backward compatibility and potential fallback
@@ -35,14 +35,14 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds Semantic Kernel-powered workflow services (alternative registration method)
+    /// Adds AI-powered workflow services with framework-agnostic interfaces
     /// </summary>
     /// <param name="services">The service collection</param>
     /// <returns>The service collection for chaining</returns>
-    public static IServiceCollection AddSemanticKernelWorkflowServices(this IServiceCollection services)
+    public static IServiceCollection AddAiWorkflowServices(this IServiceCollection services)
     {
-        // Register only SK-powered services (cleaner approach)
-        services.AddScoped<IWorkflowEngine, SemanticKernelWorkflowEngine>();
+        // Register only AI-powered services (cleaner approach)
+        services.AddScoped<IWorkflowEngine, AiWorkflowEngine>();
         services.AddScoped<IVariableResolver, VariableResolver>();
         
         return services;
