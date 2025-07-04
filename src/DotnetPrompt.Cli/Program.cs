@@ -7,6 +7,7 @@ using DotnetPrompt.Core;
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Parsing;
 using DotnetPrompt.Infrastructure;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -47,6 +48,16 @@ public class Program
     private static ServiceCollection ConfigureServices()
     {
         var services = new ServiceCollection();
+
+        // Build configuration first
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        // Register configuration as singleton
+        services.AddSingleton<IConfiguration>(configuration);
 
         // Configure logging
         services.AddLogging(builder =>

@@ -106,13 +106,10 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         {
             _logger.LogInformation("Validating workflow with SK: {WorkflowName}", workflow.Name ?? "unnamed");
 
-            // Get kernel for validation
-            _kernel ??= await _kernelFactory.CreateKernelAsync();
-
             var errors = new List<string>();
             var warnings = new List<string>();
 
-            // Validate workflow structure
+            // Validate workflow structure (no AI provider needed)
             if (string.IsNullOrEmpty(workflow.Content?.RawMarkdown))
             {
                 errors.Add("Workflow content cannot be empty");
@@ -124,9 +121,30 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 warnings.Add("No model specified in frontmatter, will use default");
             }
 
-            // Validate available functions in kernel
-            var availableFunctions = _kernel.Plugins.GetFunctionsMetadata();
-            _logger.LogDebug("Available SK functions: {FunctionCount}", availableFunctions.Count());
+            // Validate provider configuration exists (but don't initialize it)
+            var providerName = ExtractProviderFromModel(workflow.Model) ?? "openai";
+            if (!IsProviderConfigured(providerName))
+            {
+                warnings.Add($"AI provider '{providerName}' may not be properly configured. Ensure required environment variables or configuration are set before execution.");
+            }
+
+            // Only create kernel if we need advanced validation and have a provider configured
+            if (context.RequireAdvancedValidation && IsProviderConfigured(providerName))
+            {
+                try
+                {
+                    _kernel ??= await _kernelFactory.CreateKernelAsync();
+                    
+                    // Validate available functions in kernel
+                    var availableFunctions = _kernel.Plugins.GetFunctionsMetadata();
+                    _logger.LogDebug("Available SK functions: {FunctionCount}", availableFunctions.Count());
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not initialize AI provider for advanced validation");
+                    warnings.Add($"Could not validate AI provider connectivity: {ex.Message}");
+                }
+            }
 
             // Validate variable references (delegated to existing variable resolver)
             var workflowPrompt = PrepareWorkflowPrompt(workflow, context);
@@ -222,5 +240,40 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
     {
         // Count function calls in the conversation
         return chatHistory.Count(message => message.Role == AuthorRole.Tool);
+    }
+
+    private bool IsProviderConfigured(string providerName)
+    {
+        // Check if the required configuration exists for the provider without actually initializing it
+        return providerName.ToLowerInvariant() switch
+        {
+            "openai" => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY")),
+            "github" => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_TOKEN")),
+            "azure" => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")),
+            "local" or "ollama" => true, // Local providers don't require API keys
+            _ => false // Unknown providers are considered not configured
+        };
+    }
+
+    private string? ExtractProviderFromModel(string? model)
+    {
+        if (string.IsNullOrEmpty(model))
+            return null;
+
+        // Check if model is in "provider/model" format
+        var parts = model.Split('/', 2);
+        if (parts.Length == 2)
+        {
+            return parts[0]; // Return the provider part
+        }
+
+        // Default provider based on common model names
+        return model.ToLowerInvariant() switch
+        {
+            var m when m.StartsWith("gpt-") => "openai",
+            var m when m.StartsWith("claude-") => "anthropic",
+            var m when m.StartsWith("llama") => "local",
+            _ => "openai" // Default to OpenAI
+        };
     }
 }
