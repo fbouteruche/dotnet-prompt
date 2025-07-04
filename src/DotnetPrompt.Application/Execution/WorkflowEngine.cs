@@ -218,6 +218,6 @@ public class WorkflowEngine : IWorkflowEngine
         // - Sub-workflow calls
         // - Tool invocations
 
-        return steps;
+        return await Task.FromResult(steps);
     }
 }

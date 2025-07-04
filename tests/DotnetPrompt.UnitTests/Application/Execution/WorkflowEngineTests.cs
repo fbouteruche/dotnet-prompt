@@ -124,7 +124,7 @@ public class WorkflowEngineTests
                              // Simulate cancellation during step execution
                              cancellationTokenSource.Cancel();
                              ct.ThrowIfCancellationRequested();
-                             return new StepExecutionResult(true, "Should not reach here");
+                             return await Task.FromResult(new StepExecutionResult(true, "Should not reach here"));
                          });
 
         // Act
