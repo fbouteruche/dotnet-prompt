@@ -72,6 +72,7 @@ public class ProjectAnalysisPlugin
         [Description("Maximum depth to search (default: 10)")] int maxDepth = 10,
         CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask; // Async compliance for SK function
         try
         {
             _logger.LogInformation("Finding project files via SK function in: {SearchPath}", searchPath);
@@ -117,8 +118,6 @@ public class ProjectAnalysisPlugin
             _logger.LogError(ex, "Error finding project files in {SearchPath} via SK function", searchPath);
             throw new KernelException($"Project file search failed: {ex.Message}", ex);
         }
-        
-        await Task.CompletedTask;
     }
 
     [KernelFunction("get_project_dependencies")]
@@ -272,7 +271,7 @@ public class ProjectAnalysisPlugin
         return properties;
     }
 
-    private static async Task<List<string>> GetSourceFiles(string projectDirectory, CancellationToken cancellationToken)
+    private static Task<List<string>> GetSourceFiles(string projectDirectory, CancellationToken cancellationToken)
     {
         var sourceFiles = new List<string>();
         var extensions = new[] { "*.cs", "*.fs", "*.vb" };
@@ -290,6 +289,6 @@ public class ProjectAnalysisPlugin
             }
         }
 
-        return sourceFiles;
+        return Task.FromResult(sourceFiles);
     }
 }

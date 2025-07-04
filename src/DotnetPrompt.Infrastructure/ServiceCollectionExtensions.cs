@@ -26,36 +26,48 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds Semantic Kernel services and plugins to the dependency injection container
+    /// Adds AI provider services with framework-agnostic interfaces
+    /// Uses Semantic Kernel as the implementation but through agnostic interfaces
     /// </summary>
     /// <param name="services">The service collection</param>
     /// <returns>The service collection for chaining</returns>
-    public static IServiceCollection AddSemanticKernelServices(this IServiceCollection services)
+    public static IServiceCollection AddAiProviderServices(this IServiceCollection services)
     {
-        // Register core SK services
+        // Register core AI orchestration services with framework-agnostic interfaces
         services.AddSingleton<IKernelFactory, KernelFactory>();
-        services.AddSingleton<ISemanticKernelOrchestrator, SemanticKernelOrchestrator>();
+        services.AddSingleton<IWorkflowOrchestrator, SemanticKernelOrchestrator>();
         
-        // Register SK plugins
+        // Register SK plugins (implementation detail behind the orchestrator)
         services.AddTransient<WorkflowExecutorPlugin>();
         services.AddTransient<FileOperationsPlugin>();
         services.AddTransient<ProjectAnalysisPlugin>();
         
-        // Register SK filters
+        // Register SK filters (implementation detail)
         services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
         
         return services;
     }
 
     /// <summary>
-    /// Adds all infrastructure services including SK integration
+    /// Adds Semantic Kernel services and plugins (legacy method for compatibility)
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection for chaining</returns>
+    [Obsolete("Use AddAiProviderServices for framework-agnostic approach")]
+    public static IServiceCollection AddSemanticKernelServices(this IServiceCollection services)
+    {
+        return services.AddAiProviderServices();
+    }
+
+    /// <summary>
+    /// Adds all infrastructure services including AI provider integration
     /// </summary>
     /// <param name="services">The service collection</param>
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
         services.AddConfigurationServices();
-        services.AddSemanticKernelServices();
+        services.AddAiProviderServices();
         
         return services;
     }

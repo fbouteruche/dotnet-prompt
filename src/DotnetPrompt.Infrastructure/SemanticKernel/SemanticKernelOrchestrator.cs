@@ -11,8 +11,9 @@ namespace DotnetPrompt.Infrastructure.SemanticKernel;
 
 /// <summary>
 /// Semantic Kernel-powered workflow orchestrator that leverages SK's function calling and conversation management
+/// This is the SK-specific implementation of the framework-agnostic IWorkflowOrchestrator interface
 /// </summary>
-public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
+public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 {
     private readonly IKernelFactory _kernelFactory;
     private readonly ILogger<SemanticKernelOrchestrator> _logger;
@@ -156,15 +157,15 @@ public class SemanticKernelOrchestrator : ISemanticKernelOrchestrator
         return _kernel ?? throw new InvalidOperationException("Kernel not initialized. Call ExecuteWorkflowAsync or ValidateWorkflowAsync first.");
     }
 
-    public async Task<ChatHistory> GetChatHistoryAsync(string workflowId)
+    public Task<ChatHistory> GetChatHistoryAsync(string workflowId)
     {
         if (_conversationStore.TryGetValue(workflowId, out var history))
         {
-            return history;
+            return Task.FromResult(history);
         }
 
         // Return new chat history if not found
-        return new ChatHistory();
+        return Task.FromResult(new ChatHistory());
     }
 
     public async Task SaveChatHistoryAsync(string workflowId, ChatHistory chatHistory)
