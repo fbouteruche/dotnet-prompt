@@ -1,6 +1,7 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Infrastructure;
 using DotnetPrompt.Infrastructure.SemanticKernel;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
@@ -15,6 +16,8 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
         // Act
         services.AddSemanticKernelOrchestrator();
@@ -50,11 +53,12 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddSemanticKernelOrchestrator_RegistersBasicKernelFactory()
+    public void AddSemanticKernelOrchestrator_RegistersKernelFactory()
     {
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
         // Act
         services.AddSemanticKernelOrchestrator();
@@ -64,7 +68,7 @@ public class ServiceCollectionExtensionsTests
         var kernelFactory = serviceProvider.GetService<IKernelFactory>();
         
         Assert.NotNull(kernelFactory);
-        Assert.IsType<BasicKernelFactory>(kernelFactory);
+        Assert.IsType<KernelFactory>(kernelFactory);
     }
 
     [Fact]
@@ -73,6 +77,7 @@ public class ServiceCollectionExtensionsTests
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
         // Act
         services.AddSemanticKernelOrchestrator();
@@ -91,6 +96,7 @@ public class ServiceCollectionExtensionsTests
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
         // Act
         services.AddAiProviderServices();
@@ -114,6 +120,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging();
 
         // Act
         services.AddConfigurationServices();
@@ -130,6 +137,7 @@ public class ServiceCollectionExtensionsTests
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
         // Act
         services.AddInfrastructureServices();
@@ -152,6 +160,7 @@ public class ServiceCollectionExtensionsTests
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
         // Act
         services.AddSemanticKernelOrchestrator();
@@ -167,7 +176,7 @@ public class ServiceCollectionExtensionsTests
         var orchestratorDescriptor = serviceDescriptors.First(s => s.ServiceType == typeof(IWorkflowOrchestrator));
         Assert.Equal(ServiceLifetime.Scoped, orchestratorDescriptor.Lifetime);
         
-        // Verify BasicKernelFactory is singleton
+        // Verify KernelFactory is singleton
         var kernelFactoryDescriptor = serviceDescriptors.First(s => s.ServiceType == typeof(IKernelFactory));
         Assert.Equal(ServiceLifetime.Singleton, kernelFactoryDescriptor.Lifetime);
     }
