@@ -261,10 +261,30 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(), // Enable automatic function calling
             MaxTokens = workflow.Config?.MaxOutputTokens ?? 4000,
-            Temperature = workflow.Config?.Temperature ?? 0.7
+            Temperature = workflow.Config?.Temperature ?? 0.7,
+            
+            // Enable content safety features
+            User = GenerateUserId(), // Add user identification for tracking
+            
+            // Configure response formatting to prevent injection in responses
+            ResponseFormat = "text", // Ensure plain text responses
+            
+            // Add stop sequences to prevent continuation of potentially harmful content
+            StopSequences = new[] { "\n---STOP---\n", "\n[SYSTEM]", "\n[ADMIN]" }
         };
 
         return settings;
+    }
+
+    /// <summary>
+    /// Generate a unique user ID for tracking and safety purposes
+    /// </summary>
+    private static string GenerateUserId()
+    {
+        // Generate a consistent but anonymized user ID for content safety tracking
+        var sessionId = System.Diagnostics.Activity.Current?.Id ?? Guid.NewGuid().ToString();
+        var hash = Math.Abs(sessionId.GetHashCode());
+        return $"dotnet-prompt-{hash}";
     }
 
     private bool IsProviderConfigured(string providerName)
