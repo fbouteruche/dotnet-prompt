@@ -5,7 +5,6 @@ using DotnetPrompt.Infrastructure.Filters;
 using DotnetPrompt.Infrastructure.Middleware;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
-using DotnetPrompt.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -37,9 +36,6 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddSemanticKernelErrorHandling(this IServiceCollection services)
     {
-        // Register SK-native prompt safety service
-        services.AddSingleton<IPromptSafetyService, PromptSafetyService>();
-
         // Register main workflow execution filter (already implements both interfaces)
         services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
         services.AddSingleton<IPromptRenderFilter>(serviceProvider => 
