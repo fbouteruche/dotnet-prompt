@@ -72,8 +72,9 @@ public class KernelFactory : IKernelFactory
         // Register workflow-specific services
         builder.Services.AddSingleton(_serviceProvider.GetRequiredService<IConfigurationService>());
 
-        // Add workflow execution filter for cross-cutting concerns
-        builder.Services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
+        // Get the workflow execution filter from the main service provider
+        var workflowFilter = _serviceProvider.GetRequiredService<IFunctionInvocationFilter>();
+        builder.Services.AddSingleton(workflowFilter);
 
         // Build the kernel
         var kernel = builder.Build();
@@ -99,7 +100,7 @@ public class KernelFactory : IKernelFactory
         // Get provider from hierarchy: parameter > configuration > environment > default
         providerName ??= _configuration["AI:DefaultProvider"] 
                       ?? Environment.GetEnvironmentVariable("DOTNET_PROMPT_PROVIDER")
-                      ?? "openai";
+                      ?? "github";
 
         _logger.LogInformation("Configuring AI provider: {Provider}", providerName);
 
