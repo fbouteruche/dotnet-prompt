@@ -51,10 +51,9 @@ public class KernelFactory : IKernelFactory
 
     public async Task<Kernel> CreateKernelAsync(string? providerName = null, Dictionary<string, object>? configuration = null)
     {
-        // Add all built-in workflow plugins by default
+        // Add all built-in workflow plugins by default (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
         var pluginTypes = new[]
         {
-            typeof(Plugins.WorkflowExecutorPlugin),
             typeof(Plugins.FileOperationsPlugin),
             typeof(Plugins.ProjectAnalysisPlugin)
         };
