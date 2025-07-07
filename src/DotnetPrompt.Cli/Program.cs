@@ -79,8 +79,8 @@ public class Program
         // Register application services
         services.AddScoped<IWorkflowService, WorkflowService>();
         
-        // Register workflow execution services (SK-powered)
-        services.AddWorkflowExecutionServices();
+        // Register application services
+        services.AddApplicationServices();
 
         // Register parsing services
         services.AddScoped<IDotpromptParser, DotpromptParser>();

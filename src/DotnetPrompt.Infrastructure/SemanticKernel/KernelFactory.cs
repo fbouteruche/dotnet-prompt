@@ -70,7 +70,6 @@ public class KernelFactory : IKernelFactory
         await ConfigureAIServicesAsync(builder, providerName, configuration);
 
         // Register workflow-specific services
-        builder.Services.AddSingleton(_serviceProvider.GetRequiredService<IVariableResolver>());
         builder.Services.AddSingleton(_serviceProvider.GetRequiredService<IConfigurationService>());
 
         // Add workflow execution filter for cross-cutting concerns
