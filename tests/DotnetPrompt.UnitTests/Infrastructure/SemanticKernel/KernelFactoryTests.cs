@@ -53,7 +53,7 @@ public class KernelFactoryTests
     public async Task CreateKernelAsync_WithDefaultSettings_CreatesKernelSuccessfully()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key"); // KernelFactory defaults to OpenAI
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token"); // KernelFactory defaults to GitHub Models
         
         try
         {
@@ -65,7 +65,7 @@ public class KernelFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
         }
     }
 
@@ -147,10 +147,10 @@ public class KernelFactoryTests
     }
 
     [Fact]
-    public async Task CreateKernelAsync_WithUnknownProvider_DefaultsToOpenAI()
+    public async Task CreateKernelAsync_WithUnknownProvider_DefaultsToGitHub()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
         
         try
         {
@@ -162,7 +162,7 @@ public class KernelFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
         }
     }
 
@@ -194,7 +194,7 @@ public class KernelFactoryTests
     public async Task CreateKernelWithPluginsAsync_WithValidPlugins_CreatesKernelSuccessfully()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
         var pluginTypes = new[]
         {
             typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileOperationsPlugin),
@@ -212,7 +212,7 @@ public class KernelFactoryTests
         }
         finally
         {
-            Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
         }
     }
 
