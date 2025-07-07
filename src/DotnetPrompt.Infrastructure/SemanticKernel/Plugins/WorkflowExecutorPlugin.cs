@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using DotnetPrompt.Core.Interfaces;
+using System.Text.RegularExpressions;
 using DotnetPrompt.Core.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -13,12 +13,11 @@ namespace DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 public class WorkflowExecutorPlugin
 {
     private readonly ILogger<WorkflowExecutorPlugin> _logger;
-    private readonly IVariableResolver _variableResolver;
+    private static readonly Regex VariablePattern = new(@"\{\{([^}]+)\}\}", RegexOptions.Compiled);
 
-    public WorkflowExecutorPlugin(ILogger<WorkflowExecutorPlugin> logger, IVariableResolver variableResolver)
+    public WorkflowExecutorPlugin(ILogger<WorkflowExecutorPlugin> logger)
     {
         _logger = logger;
-        _variableResolver = variableResolver;
     }
 
     [KernelFunction("execute_prompt")]
@@ -39,8 +38,8 @@ public class WorkflowExecutorPlugin
             // Create execution context for variable resolution
             var context = CreateExecutionContext(variables);
             
-            // Resolve variables in the prompt
-            var resolvedPrompt = _variableResolver.ResolveVariables(prompt, context);
+            // Resolve variables in the prompt using simple substitution
+            var resolvedPrompt = ResolveVariables(prompt, context);
             
             _logger.LogDebug("Resolved prompt: {Prompt}", resolvedPrompt);
 
@@ -86,13 +85,13 @@ public class WorkflowExecutorPlugin
             _logger.LogInformation("Validating variables via SK function");
             
             var context = CreateExecutionContext(variables);
-            var validationResult = _variableResolver.ValidateTemplate(template, context);
+            var validationResult = ValidateTemplate(template, context);
             
             var result = new
             {
                 IsValid = validationResult.IsValid,
                 MissingVariables = validationResult.MissingVariables,
-                ReferencedVariables = _variableResolver.ExtractVariableReferences(template),
+                ReferencedVariables = ExtractVariableReferences(template),
                 ValidationTime = DateTimeOffset.UtcNow
             };
 
@@ -138,7 +137,7 @@ public class WorkflowExecutorPlugin
                         Index = steps.Count,
                         Content = line,
                         Type = DetermineStepType(line),
-                        Variables = _variableResolver.ExtractVariableReferences(line)
+                        Variables = ExtractVariableReferences(line)
                     });
                 }
             }
@@ -193,5 +192,90 @@ public class WorkflowExecutorPlugin
             return "prompt";
         
         return "unknown";
+    }
+
+    /// <summary>
+    /// Simple variable resolution - replaces {{variable}} with values from context
+    /// </summary>
+    private static string ResolveVariables(string template, WorkflowExecutionContext context)
+    {
+        if (string.IsNullOrEmpty(template))
+            return template;
+
+        return VariablePattern.Replace(template, match =>
+        {
+            var variableName = match.Groups[1].Value.Trim();
+            
+            if (context.Variables.TryGetValue(variableName, out var value))
+            {
+                return value?.ToString() ?? string.Empty;
+            }
+
+            // If variable is not found, leave the placeholder as-is
+            return match.Value;
+        });
+    }
+
+    /// <summary>
+    /// Validates that all variables in a template can be resolved
+    /// </summary>
+    private static VariableValidationResult ValidateTemplate(string template, WorkflowExecutionContext context)
+    {
+        if (string.IsNullOrEmpty(template))
+            return new VariableValidationResult(true);
+
+        var missingVariables = new HashSet<string>();
+        var errors = new List<string>();
+
+        var matches = VariablePattern.Matches(template);
+        foreach (Match match in matches)
+        {
+            var variableName = match.Groups[1].Value.Trim();
+            
+            if (string.IsNullOrEmpty(variableName))
+            {
+                errors.Add($"Empty variable name in template: {match.Value}");
+                continue;
+            }
+
+            if (!context.Variables.ContainsKey(variableName))
+            {
+                missingVariables.Add(variableName);
+            }
+        }
+
+        if (missingVariables.Count > 0)
+        {
+            errors.Add($"Missing variables: {string.Join(", ", missingVariables)}");
+        }
+
+        return new VariableValidationResult(
+            IsValid: errors.Count == 0,
+            MissingVariables: missingVariables.Count > 0 ? missingVariables : null,
+            Errors: errors.Count > 0 ? errors.ToArray() : null
+        );
+    }
+
+    /// <summary>
+    /// Extracts variable references from a template
+    /// </summary>
+    private static HashSet<string> ExtractVariableReferences(string template)
+    {
+        var variables = new HashSet<string>();
+        
+        if (string.IsNullOrEmpty(template))
+            return variables;
+
+        var matches = VariablePattern.Matches(template);
+        foreach (Match match in matches)
+        {
+            var variableName = match.Groups[1].Value.Trim();
+            if (!string.IsNullOrEmpty(variableName))
+            {
+                variables.Add(variableName);
+            }
+        }
+
+        return variables;
     }
 }

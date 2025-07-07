@@ -13,18 +13,18 @@ public class WorkflowService : IWorkflowService
     private readonly ILogger<WorkflowService> _logger;
     private readonly IDotpromptParser _parser;
     private readonly IConfigurationService _configurationService;
-    private readonly IWorkflowEngine _workflowEngine;
+    private readonly IWorkflowOrchestrator _workflowOrchestrator;
 
     public WorkflowService(
         ILogger<WorkflowService> logger, 
         IDotpromptParser parser, 
         IConfigurationService configurationService,
-        IWorkflowEngine workflowEngine)
+        IWorkflowOrchestrator workflowOrchestrator)
     {
         _logger = logger;
         _parser = parser;
         _configurationService = configurationService;
-        _workflowEngine = workflowEngine;
+        _workflowOrchestrator = workflowOrchestrator;
     }
 
     public async Task<WorkflowExecutionResult> ExecuteAsync(string workflowFilePath, WorkflowExecutionOptions options, CancellationToken cancellationToken = default)
@@ -58,8 +58,8 @@ public class WorkflowService : IWorkflowService
                 context.SetVariable("context", options.Context);
             }
 
-            // Execute the workflow using the engine
-            var result = await _workflowEngine.ExecuteAsync(workflow, context, cancellationToken);
+            // Execute the workflow using the orchestrator
+            var result = await _workflowOrchestrator.ExecuteWorkflowAsync(workflow, context, cancellationToken);
             
             _logger.LogInformation("Workflow execution completed. Success: {Success}, Duration: {Duration}ms", 
                 result.Success, result.ExecutionTime.TotalMilliseconds);
@@ -103,8 +103,8 @@ public class WorkflowService : IWorkflowService
                 WorkingDirectory = Path.GetDirectoryName(workflowFilePath) ?? Environment.CurrentDirectory
             };
 
-            // Validate using the workflow engine
-            var engineValidation = await _workflowEngine.ValidateAsync(workflow, context, cancellationToken);
+            // Validate using the workflow orchestrator
+            var engineValidation = await _workflowOrchestrator.ValidateWorkflowAsync(workflow, context, cancellationToken);
             
             _logger.LogInformation("Workflow validation completed. Valid: {IsValid}", engineValidation.IsValid);
             
