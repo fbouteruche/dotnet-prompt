@@ -18,31 +18,101 @@ This document defines how workflows can compose and invoke sub-workflows using S
 
 ### Sub-workflow as SK Function
 
-#### Workflow Function Registration
+#### SubWorkflowPlugin Implementation
 ```csharp
-[KernelFunction("invoke_sub_workflow")]
-[Description("Executes a sub-workflow and returns its results")]
-public async Task<WorkflowResult> InvokeSubWorkflowAsync(
-    [Description("Path to the sub-workflow file")] string workflowPath,
-    [Description("Parameters to pass to the sub-workflow")] Dictionary<string, object> parameters,
-    [Description("Context inheritance mode: inherit, isolated, or merge")] string contextMode = "inherit",
-    KernelArguments? arguments = null,
-    CancellationToken cancellationToken = default)
+[Description("Executes and composes sub-workflows")]
+public class SubWorkflowPlugin
 {
-    // SK automatically handles parameter validation and type conversion
-    var subWorkflowContext = await CreateSubWorkflowContext(workflowPath, parameters, contextMode, arguments);
-    
-    // Execute sub-workflow with SK orchestration
-    var subKernel = await _kernelFactory.CreateKernelForSubWorkflowAsync(subWorkflowContext);
-    var result = await subKernel.InvokeAsync("execute_workflow", subWorkflowContext.ToKernelArguments());
-    
-    return new WorkflowResult
+    private readonly IDotpromptParser _parser;
+    private readonly IWorkflowOrchestrator _orchestrator;
+    private readonly ILogger<SubWorkflowPlugin> _logger;
+
+    [KernelFunction("execute_sub_workflow")]
+    [Description("Executes a sub-workflow from a file path with parameters")]
+    [return: Description("The result of the sub-workflow execution")]
+    public async Task<string> ExecuteSubWorkflowAsync(
+        [Description("Relative or absolute path to the sub-workflow .prompt.md file")] string workflowPath,
+        [Description("JSON object containing variables for the sub-workflow")] string parameters = "{}",
+        [Description("Context inheritance mode: 'inherit', 'isolated', or 'merge'")] string contextMode = "inherit",
+        CancellationToken cancellationToken = default)
     {
-        Success = true,
-        Result = result.GetValue<string>(),
-        Context = subWorkflowContext,
-        ExecutionMetadata = ExtractExecutionMetadata(result)
-    };
+        try
+        {
+            _logger.LogInformation("Executing sub-workflow: {WorkflowPath}", workflowPath);
+
+            // 1. Parse the sub-workflow using the main parser
+            var subWorkflow = await _parser.ParseFileAsync(workflowPath, cancellationToken);
+            
+            // 2. Create execution context based on mode and parameters
+            var subContext = CreateSubWorkflowContext(parameters, contextMode);
+            
+            // 3. Execute sub-workflow using the main orchestrator (recursive composition)
+            var result = await _orchestrator.ExecuteWorkflowAsync(subWorkflow, subContext, cancellationToken);
+            
+            if (!result.Success)
+            {
+                throw new KernelException($"Sub-workflow execution failed: {result.ErrorMessage}");
+            }
+
+            _logger.LogInformation("Sub-workflow completed successfully: {WorkflowPath}", workflowPath);
+            return result.Output ?? "Sub-workflow completed successfully";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing sub-workflow: {WorkflowPath}", workflowPath);
+            throw new KernelException($"Sub-workflow execution failed: {ex.Message}", ex);
+        }
+    }
+
+    [KernelFunction("validate_sub_workflow")]
+    [Description("Validates a sub-workflow without executing it")]
+    [return: Description("JSON validation result")]
+    public async Task<string> ValidateSubWorkflowAsync(
+        [Description("Path to the sub-workflow file")] string workflowPath,
+        [Description("JSON object containing variables to validate")] string parameters = "{}",
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var subWorkflow = await _parser.ParseFileAsync(workflowPath, cancellationToken);
+            var subContext = CreateSubWorkflowContext(parameters, "isolated");
+            
+            var validationResult = await _orchestrator.ValidateWorkflowAsync(subWorkflow, subContext, cancellationToken);
+            
+            return JsonSerializer.Serialize(new
+            {
+                IsValid = validationResult.IsValid,
+                Errors = validationResult.Errors,
+                Warnings = validationResult.Warnings
+            }, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex)
+        {
+            throw new KernelException($"Sub-workflow validation failed: {ex.Message}", ex);
+        }
+    }
+
+    private WorkflowExecutionContext CreateSubWorkflowContext(string parametersJson, string contextMode)
+    {
+        var context = new WorkflowExecutionContext();
+        
+        // Parse parameters from JSON
+        if (!string.IsNullOrEmpty(parametersJson) && parametersJson != "{}")
+        {
+            var parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(parametersJson);
+            foreach (var (key, value) in parameters ?? new())
+            {
+                context.SetVariable(key, value);
+            }
+        }
+
+        // Handle context inheritance modes (to be implemented based on requirements)
+        // - "inherit": Copy parent context variables
+        // - "isolated": Start with empty context
+        // - "merge": Combine parent and provided parameters
+        
+        return context;
+    }
 }
 ```
 
@@ -71,81 +141,101 @@ Finally, validate all generated documentation for consistency and completeness.
 > 3. Execute validation workflows with generated documentation
 > 4. Handle parameter passing and context inheritance automatically
 
-### Explicit Sub-workflow Invocation (SK Functions)
-```markdown
-Execute project analysis and documentation generation:
+### Explicit Sub-workflow Invocation (Handlebars Templates)
+```handlebars
+{{!-- Execute project analysis and documentation generation --}}
 
-{{sk_function: invoke_sub_workflow
-  parameters:
-    workflow_path: "./analysis/project-analysis.prompt.md"
-    parameters:
-      project_path: "{{project_path}}"
-      include_tests: true
-      analysis_depth: "comprehensive"
-    context_mode: "inherit"
+## Project Analysis
+{{execute_sub_workflow 
+  workflowPath="./analysis/project-analysis.prompt.md"
+  parameters=(json 
+    project_path=project_path
+    include_tests=true
+    analysis_depth="comprehensive")
+  contextMode="inherit"
 }}
 
-Generate API documentation using analysis results:
+## API Documentation Generation
+{{#if generate_docs}}
+{{execute_sub_workflow 
+  workflowPath="./docs/generate-api-docs.prompt.md" 
+  parameters=(json 
+    project_metadata=analysis_result.metadata
+    output_format="markdown"
+    include_examples=true)
+  contextMode="merge"
+}}
+{{/if}}
 
-{{sk_function: invoke_sub_workflow
-  parameters:
-    workflow_path: "./docs/generate-api-docs.prompt.md" 
-    parameters:
-      project_metadata: "{{previous_result.metadata}}"
-      output_format: "markdown"
-      include_examples: true
-    context_mode: "merge"
+## Summary Report
+{{execute_sub_workflow 
+  workflowPath="./reports/summary.prompt.md"
+  parameters="{}"
+  contextMode="inherit"
 }}
 ```
 
 ### Enhanced Parameter Mapping with SK Validation
 ```yaml
-# Main workflow frontmatter with SK integration
+# Main workflow frontmatter with SK Handlebars integration
 ---
-sk_configuration:
-  execution_settings:
-    function_choice_behavior: "auto"
-    temperature: 0.7
-    max_tokens: 4000
-  
-parameters:
-  - name: "project_path"
-    type: "string"
-    required: true
-    description: "Path to the .NET project file"
-    sk_validation:
-      pattern: ".*\\.(csproj|fsproj|vbproj)$"
-      file_exists: true
-  - name: "output_directory" 
-    type: "string"
-    default: "./docs"
-    description: "Directory for generated documentation"
-    sk_validation:
-      ensure_directory: true
-      writable: true
+name: "project-documentation-workflow"
+model: "gpt-4o"
+tools: ["project-analysis", "file-system", "sub-workflow"]
 
+config:
+  temperature: 0.7
+  maxOutputTokens: 4000
+
+input:
+  default:
+    project_path: "."
+    generate_docs: true
+    output_directory: "./docs"
+  schema:
+    project_path:
+      type: string
+      description: "Path to the .NET project file"
+      pattern: ".*\\.(csproj|fsproj|vbproj|sln)$"
+    output_directory: 
+      type: string
+      default: "./docs"
+      description: "Directory for generated documentation"
+    generate_docs:
+      type: boolean
+      default: true
+      description: "Whether to generate documentation"
+
+# Sub-workflow definitions for reference
 sub_workflows:
   - name: "project_analysis"
     path: "./analysis/project-analysis.prompt.md"
-    sk_function_config:
-      timeout_seconds: 300
-      retry_attempts: 2
-      cache_results: true
+    timeout_seconds: 300
+    retry_attempts: 2
+    cache_results: true
+  - name: "api_documentation"
+    path: "./docs/generate-api-docs.prompt.md"
+    depends_on: ["project_analysis"]
 ---
 
-# SK will automatically orchestrate these workflows based on the prompt content
-{{sk_function: invoke_sub_workflow
-  parameters:
-    workflow_path: "{{sub_workflows.project_analysis.path}}"
-    parameters:
-      input_path: "{{project_path}}"
-      output_path: "{{output_directory}}/analysis"
-      analysis_options:
-        include_dependencies: true
-        scan_for_vulnerabilities: false
-        generate_metrics: true
-    context_mode: "inherit"
-}}
+# SK will automatically orchestrate these workflows using Handlebars templating
+# The SubWorkflowPlugin is available as an SK function for the AI to call
+
+Analyze the project at {{project_path}} and generate comprehensive documentation.
+
+First, perform project analysis:
+- Include dependency analysis and test coverage
+- Generate metrics and identify potential issues
+- Store results for subsequent workflows
+
+{{#if generate_docs}}
+Then, based on the analysis results, generate documentation:
+- API documentation from the code structure  
+- README file with project overview
+- Architecture documentation
+{{/if}}
+
+The AI will automatically call the execute_sub_workflow function with appropriate parameters.
 ```
 ```
 
@@ -173,12 +263,23 @@ How MCP server requirements are handled across workflow boundaries.
 
 ## Sub-workflow Return Values
 
-### Result Propagation
-```markdown
-{{set: analysis_result = invoke: ./analysis.prompt.md}}
+### Result Propagation (Handlebars Variables)
+```handlebars
+{{!-- Execute analysis and capture result --}}
+{{set analysis_result = (execute_sub_workflow 
+  workflowPath="./analysis.prompt.md"
+  parameters=(json project_path=project_path))
+}}
 
+{{!-- Use the result in subsequent content --}}
 The analysis found {{analysis_result.issues_count}} issues:
 {{analysis_result.summary}}
+
+{{!-- Pass results to another sub-workflow --}}
+{{execute_sub_workflow 
+  workflowPath="./generate-report.prompt.md"
+  parameters=(json analysis_data=analysis_result)
+}}
 ```
 
 ### Structured Results

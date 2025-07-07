@@ -79,28 +79,28 @@ Use **System.CommandLine** for robust CLI functionality:
 
 ### 4.2 Application Layer (DotnetPrompt.Application)
 
-Implements use cases leveraging **Semantic Kernel** for AI orchestration and all cross-cutting concerns:
+Implements use cases leveraging **Semantic Kernel** for AI orchestration and **native Handlebars templating**:
 
 ```csharp
 // Use Cases (MediatR Handlers)
-- ExecuteWorkflowHandler (uses SK function calling & planning)
+- ExecuteWorkflowHandler (uses SemanticKernelOrchestrator with Handlebars)
 - RestoreDependenciesHandler (uses SK tool orchestration)
-- ValidateWorkflowHandler (uses SK prompt templates)
+- ValidateWorkflowHandler (uses SK Handlebars template validation)
 - ResumeWorkflowHandler (uses SK conversation state & chat history)
 - ListWorkflowsHandler (uses SK vector search for discovery)
 
-// Services (All SK-powered)
-- IWorkflowOrchestrator (wraps SK Kernel with automatic function calling)
+// Services (SK-native implementation)
+- IWorkflowOrchestrator (SemanticKernelOrchestrator with Handlebars templates)
 - IProgressManager (uses SK ChatHistory and conversation state persistence)
 - IConfigurationResolver (uses SK dependency injection patterns)
-- IKernelFactory (configures SK with providers, tools, filters, and middleware)
+- IKernelFactory (configures SK with providers, tools, and Handlebars factory)
 - IConversationStateManager (uses SK ChatHistory and memory persistence)
-- IPromptTemplateManager (uses SK prompt template engine)
 ```
 
 **Key Responsibilities:**
-- Workflow execution orchestration via SK function calling
-- Sub-workflow composition via SK automatic planning
+- Workflow execution orchestration via SK Handlebars templates and function calling
+- Variable substitution via SK native Handlebars templating engine
+- Sub-workflow composition via dedicated SubWorkflowPlugin
 - Progress tracking and resume via SK conversation state management
 - Configuration hierarchy via SK dependency injection patterns
 - Error handling and retry via SK filters and middleware
@@ -141,11 +141,12 @@ External integrations and persistence, fully leveraging SK capabilities:
 - SK filters for retry policies, rate limiting, and circuit breakers
 - SK middleware for logging, telemetry, and authentication
 
-// Semantic Kernel Integration (Comprehensive)
+// Semantic Kernel Integration (Native Handlebars + Plugins)
 - KernelBuilder with full dependency injection setup
-- Built-in tool plugins with SK function annotations
+- HandlebarsPromptTemplateFactory for dotprompt-compatible templating
+- Built-in tool plugins with SK function annotations (no WorkflowExecutorPlugin)
+- SubWorkflowPlugin for sub-workflow composition and orchestration
 - SK ChatHistory persistence for conversation state
-- SK prompt template engine for dynamic prompt management
 - SK vector store connectors for memory and caching
 - SK filters for function calling, prompt execution, and chat completion
 - SK middleware for observability, security, and performance monitoring
@@ -154,7 +155,7 @@ External integrations and persistence, fully leveraging SK capabilities:
 - ProjectAnalysisPlugin (SK function with parameter validation)
 - BuildTestPlugin (SK function with retry policies)
 - FileSystemPlugin (SK function with security filters)
-- WorkflowDiscoveryPlugin (SK function with vector search)
+- SubWorkflowPlugin (SK function for workflow composition)
 
 // Memory & Caching (SK Vector Store Connectors)
 - IVectorStore for workflow and conversation caching
@@ -218,44 +219,79 @@ builder.Services.AddSingleton<IVectorStore>(provider =>
 var kernel = builder.Build();
 ```
 
-### 5.2 SK Function Calling for All Tool Operations
+### 5.2 SK Native Handlebars Templating for Variable Substitution
 
 ```csharp
-// Built-in tools as SK functions with comprehensive annotations
-[KernelFunction("analyze_project")]
-[Description("Analyzes a .NET project and returns comprehensive information about its structure, dependencies, and configuration")]
-[return: Description("JSON object containing project analysis results")]
-public async Task<ProjectAnalysisResult> AnalyzeProjectAsync(
-    [Description("The absolute path to the project file (.csproj/.fsproj/.vbproj)")] 
-    string projectPath,
-    [Description("Include dependency analysis (default: true)")] 
-    bool includeDependencies = true,
-    KernelArguments? arguments = null,
-    CancellationToken cancellationToken = default)
+// Native SK Handlebars integration instead of custom regex replacement
+public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 {
-    // SK automatically handles parameter validation, type conversion, and error handling
-    // Implementation delegates to domain services
-}
-
-// Automatic function calling for workflow execution
-var executionSettings = new OpenAIPromptExecutionSettings
-{
-    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(), // SK planning
-    Temperature = config.Temperature,
-    MaxTokens = config.MaxTokens
-};
-
-// SK handles the entire planning loop automatically
-var result = await kernel.InvokeAsync("workflow_executor", 
-    new KernelArguments
+    private readonly IHandlebarsPromptTemplateFactory _handlebarsFactory;
+    private readonly IChatCompletionService _chatService;
+    
+    public async Task<WorkflowExecutionResult> ExecuteWorkflowAsync(
+        DotpromptWorkflow workflow,
+        WorkflowExecutionContext context)
     {
-        ["workflow_content"] = workflowMarkdown,
-        ["execution_context"] = executionContext
-    }, 
-    executionSettings);
+        // 1. Create SK Handlebars template directly
+        var promptConfig = new PromptTemplateConfig
+        {
+            Template = workflow.Content.RawMarkdown,
+            TemplateFormat = "handlebars", // Native SK Handlebars support
+            Name = workflow.Name,
+            Description = workflow.Metadata?.Description
+        };
+
+        // 2. Convert context variables to KernelArguments
+        var kernelArgs = ConvertToKernelArguments(context.Variables);
+
+        // 3. Create function from template using SK's Handlebars factory
+        var function = _kernel.CreateFunctionFromPrompt(promptConfig, _handlebarsFactory);
+        
+        // 4. Execute with SK's automatic function calling
+        var executionSettings = new OpenAIPromptExecutionSettings
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+            Temperature = workflow.Config?.Temperature ?? 0.7,
+            MaxTokens = workflow.Config?.MaxOutputTokens ?? 4000
+        };
+
+        // 5. Execute with full SK orchestration (includes Handlebars rendering)
+        var result = await function.InvokeAsync(_kernel, kernelArgs);
+        
+        return new WorkflowExecutionResult(true, result.ToString());
+    }
+}
 ```
 
-### 5.3 SK ChatHistory for State Management
+### 5.3 SubWorkflowPlugin for Composition
+
+```csharp
+// Dedicated plugin for sub-workflow composition (replaces WorkflowExecutorPlugin)
+[Description("Executes and composes sub-workflows")]
+public class SubWorkflowPlugin
+{
+    private readonly IDotpromptParser _parser;
+    private readonly IWorkflowOrchestrator _orchestrator;
+
+    [KernelFunction("execute_sub_workflow")]
+    [Description("Executes a sub-workflow from a file path with parameters")]
+    public async Task<string> ExecuteSubWorkflowAsync(
+        [Description("Path to the sub-workflow .prompt.md file")] string workflowPath,
+        [Description("JSON object containing variables for the sub-workflow")] string parameters = "{}",
+        [Description("Context inheritance mode: 'inherit', 'isolated', or 'merge'")] string contextMode = "inherit",
+        CancellationToken cancellationToken = default)
+    {
+        // Parse and execute sub-workflow using the main orchestrator
+        var subWorkflow = await _parser.ParseFileAsync(workflowPath, cancellationToken);
+        var subContext = CreateSubWorkflowContext(parameters, contextMode);
+        var result = await _orchestrator.ExecuteWorkflowAsync(subWorkflow, subContext, cancellationToken);
+        
+        return result.Output ?? "Sub-workflow completed successfully";
+    }
+}
+```
+
+### 5.4 SK ChatHistory for State Management
 
 ```csharp
 // SK conversation state management with persistence
@@ -291,7 +327,7 @@ public class SkConversationStateManager : IConversationStateManager
 }
 ```
 
-### 5.4 SK Filters for Cross-Cutting Concerns
+### 5.5 SK Filters for Cross-Cutting Concerns
 
 ```csharp
 // SK filters for comprehensive error handling and observability
@@ -339,7 +375,7 @@ builder.Services.AddSingleton<IPromptRenderFilter, WorkflowExecutionFilter>();
 builder.Services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
 ```
 
-### 5.5 SK Vector Store for Intelligent Caching
+### 5.6 SK Vector Store for Intelligent Caching
 
 ```csharp
 // Intelligent workflow caching using SK Vector Store
@@ -394,14 +430,14 @@ public class SkWorkflowCacheManager
 - **System.CommandLine** for CLI parsing
 - **Microsoft.Extensions.DependencyInjection** for IoC
 
-### 6.2 Microsoft AI Ecosystem Libraries (Comprehensive SK Integration)
+### 6.2 Microsoft AI Ecosystem Libraries (SK Native Approach)
 
 - **Microsoft.Extensions.AI** - Unified AI provider abstraction with SK-compatible middleware
-- **Microsoft.SemanticKernel** - Complete AI orchestration framework with function calling, planning, and state management
-- **Microsoft.SemanticKernel.Plugins.Core** - Built-in SK plugins for time, math, and text operations
+- **Microsoft.SemanticKernel** - Complete AI orchestration framework with function calling and state management
+- **Microsoft.SemanticKernel.PromptTemplates.Handlebars** - Native Handlebars templating for dotprompt compatibility
+- **Microsoft.SemanticKernel.Plugins.Core** - Built-in SK plugins for core operations
 - **Microsoft.Extensions.VectorData.Abstractions** - SK Vector Store abstractions for memory and caching
 - **Microsoft.SemanticKernel.Connectors.Memory** - SK memory connectors for persistence
-- **Microsoft.SemanticKernel.PromptTemplates.Liquid** - Advanced prompt templating for workflows
 - **Microsoft.Extensions.AI.Abstractions** - Core interfaces for AI services
 - **C# SDK for MCP** - Native Model Context Protocol support integrated via SK plugins
 
@@ -465,6 +501,7 @@ public class SkWorkflowCacheManager
 ### 9.1 Plugin Architecture (SK Native)
 
 - **SK Function Plugins**: Additional built-in tools via SK's native plugin system
+- **SubWorkflowPlugin**: Dedicated plugin for workflow composition and orchestration
 - **Provider Extensions**: Custom AI provider implementations via Microsoft.Extensions.AI
 - **Vector Store Connectors**: Custom memory/caching implementations via SK Vector Store abstractions
 - **Filter Pipeline**: Custom SK filters for workflow-specific processing and validation
