@@ -16,6 +16,12 @@
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.59.0" />
     <PackageReference Include="Microsoft.SemanticKernel.PromptTemplates.Handlebars" Version="1.59.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="9.6.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="2.3.0" />
+    <PackageReference Include="Serilog.Enrichers.Process" Version="2.0.2" />
   </ItemGroup>
 
   <PropertyGroup>
