@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DotnetPrompt.Infrastructure.Extensions;
 using DotnetPrompt.Infrastructure.Models;
+using DotnetPrompt.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
@@ -9,15 +10,20 @@ namespace DotnetPrompt.Infrastructure.SemanticKernel;
 /// <summary>
 /// Comprehensive SK filter for workflow execution monitoring, error handling, and security validation
 /// Implements both IFunctionInvocationFilter and IPromptRenderFilter for complete SK pipeline coverage
+/// Uses SK-native content safety features for enhanced security
 /// </summary>
 public class WorkflowExecutionFilter : IFunctionInvocationFilter, IPromptRenderFilter
 {
     private readonly ILogger<WorkflowExecutionFilter> _logger;
+    private readonly IPromptSafetyService? _promptSafetyService;
     private static readonly string[] SensitiveKeys = { "apikey", "api_key", "token", "password", "secret", "key" };
 
-    public WorkflowExecutionFilter(ILogger<WorkflowExecutionFilter> logger)
+    public WorkflowExecutionFilter(
+        ILogger<WorkflowExecutionFilter> logger,
+        IPromptSafetyService? promptSafetyService = null)
     {
         _logger = logger;
+        _promptSafetyService = promptSafetyService;
     }
 
     public async Task OnFunctionInvocationAsync(FunctionInvocationContext context, Func<FunctionInvocationContext, Task> next)
@@ -111,23 +117,110 @@ public class WorkflowExecutionFilter : IFunctionInvocationFilter, IPromptRenderF
     }
 
     /// <summary>
-    /// Basic prompt safety validation to prevent obvious security issues
+    /// Enhanced prompt safety validation using SK's built-in content safety features
     /// </summary>
-    private Task ValidatePromptSafety(PromptRenderContext context)
+    private async Task ValidatePromptSafety(PromptRenderContext context)
     {
-        // Basic validation - in a real implementation, this would be more sophisticated
-        // Check for obvious prompt injection patterns
+        if (_promptSafetyService == null)
+        {
+            // Fallback to basic validation if safety service is not available
+            await ValidatePromptSafetyBasic(context);
+            return;
+        }
+
+        var correlationId = Activity.Current?.Id ?? Guid.NewGuid().ToString();
+        
+        // Extract prompt content for validation
+        var promptContent = ExtractPromptContent(context);
+        if (string.IsNullOrEmpty(promptContent))
+            return;
+
+        try
+        {
+            var safetyResult = await _promptSafetyService.ValidatePromptAsync(promptContent, correlationId);
+            
+            if (!safetyResult.IsValid)
+            {
+                var issuesText = string.Join("; ", safetyResult.Issues);
+                _logger.LogWarning("SK prompt safety validation flagged content for function {FunctionName}: {Issues} (Risk: {RiskLevel}) with correlation {CorrelationId}", 
+                    context.Function.Name, issuesText, safetyResult.RiskLevel, correlationId);
+                
+                // For high-risk content, we could throw an exception or sanitize
+                // For now, we log and continue with monitoring
+                if (safetyResult.RiskLevel == PromptRiskLevel.High)
+                {
+                    _logger.LogError("High-risk prompt content detected for function {FunctionName}: {Recommendation} with correlation {CorrelationId}", 
+                        context.Function.Name, safetyResult.Recommendation, correlationId);
+                }
+            }
+            else
+            {
+                _logger.LogDebug("Prompt content passed SK safety validation for function {FunctionName} with correlation {CorrelationId}", 
+                    context.Function.Name, correlationId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error during SK prompt safety validation for function {FunctionName} with correlation {CorrelationId}", 
+                context.Function.Name, correlationId);
+            
+            // Fall back to basic validation
+            await ValidatePromptSafetyBasic(context);
+        }
+    }
+
+    /// <summary>
+    /// Basic prompt safety validation fallback when SK service is not available
+    /// </summary>
+    private Task ValidatePromptSafetyBasic(PromptRenderContext context)
+    {
+        // Basic validation - check for obvious prompt injection patterns
         foreach (var arg in context.Arguments)
         {
             var value = arg.Value?.ToString()?.ToLowerInvariant();
             if (value != null && (value.Contains("ignore previous") || value.Contains("system prompt")))
             {
-                _logger.LogWarning("Potential prompt injection detected in parameter {ParameterName}", arg.Key);
+                _logger.LogWarning("Potential prompt injection detected in parameter {ParameterName} for function {FunctionName}", 
+                    arg.Key, context.Function.Name);
                 // In a production system, you might want to sanitize or reject the prompt
             }
         }
         
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Extract prompt content from context for validation
+    /// </summary>
+    private static string ExtractPromptContent(PromptRenderContext context)
+    {
+        var contentBuilder = new System.Text.StringBuilder();
+        
+        foreach (var argument in context.Arguments)
+        {
+            var value = argument.Value?.ToString();
+            if (!string.IsNullOrEmpty(value))
+            {
+                // Include arguments that might contain prompt content
+                if (IsPromptArgument(argument.Key))
+                {
+                    contentBuilder.AppendLine(value);
+                }
+            }
+        }
+        
+        return contentBuilder.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Determine if an argument likely contains prompt content
+    /// </summary>
+    private static bool IsPromptArgument(string argumentName)
+    {
+        var promptKeywords = new[] { "prompt", "input", "content", "text", "message", "query", "request" };
+        var nameLower = argumentName.ToLowerInvariant();
+        
+        return promptKeywords.Any(keyword => nameLower.Contains(keyword));
     }
 
     /// <summary>

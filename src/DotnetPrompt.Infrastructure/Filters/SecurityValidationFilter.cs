@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security;
 using DotnetPrompt.Infrastructure.Models;
+using DotnetPrompt.Infrastructure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
@@ -8,29 +9,19 @@ namespace DotnetPrompt.Infrastructure.Filters;
 
 /// <summary>
 /// SK filter for comprehensive security validation and prompt injection prevention
+/// Uses Semantic Kernel's built-in content safety features including OpenAI moderation API
 /// </summary>
 public class SecurityValidationFilter : IPromptRenderFilter, IFunctionInvocationFilter
 {
     private readonly ILogger<SecurityValidationFilter> _logger;
-    
-    // Common prompt injection patterns to detect
-    private static readonly string[] DangerousPatterns = 
-    {
-        "ignore previous", "ignore all previous", "forget previous", "disregard previous",
-        "system prompt", "you are now", "new instructions", "override instructions",
-        "act as", "roleplay", "pretend you are", "simulate",
-        "jailbreak", "dev mode", "ignore safety", "bypass safety"
-    };
+    private readonly IPromptSafetyService _promptSafetyService;
 
-    // Sensitive parameter names that should be monitored
-    private static readonly string[] SensitiveParameters = 
-    {
-        "apikey", "api_key", "token", "password", "secret", "key", "credential"
-    };
-
-    public SecurityValidationFilter(ILogger<SecurityValidationFilter> logger)
+    public SecurityValidationFilter(
+        ILogger<SecurityValidationFilter> logger,
+        IPromptSafetyService promptSafetyService)
     {
         _logger = logger;
+        _promptSafetyService = promptSafetyService;
     }
 
     public async Task OnPromptRenderAsync(PromptRenderContext context, Func<PromptRenderContext, Task> next)
@@ -40,13 +31,13 @@ public class SecurityValidationFilter : IPromptRenderFilter, IFunctionInvocation
 
         try
         {
-            // Validate prompt content for security issues
-            await ValidatePromptContent(context, correlationId);
+            // Use SK-native prompt safety validation
+            await ValidatePromptContentAsync(context, correlationId);
             
             await next(context);
             
             // Validate rendered prompt if accessible
-            await ValidateRenderedPrompt(context, correlationId);
+            await ValidateRenderedPromptAsync(context, correlationId);
         }
         catch (SecurityException ex)
         {
@@ -70,8 +61,8 @@ public class SecurityValidationFilter : IPromptRenderFilter, IFunctionInvocation
 
         try
         {
-            // Validate function parameters for security
-            ValidateFunctionParameters(context, correlationId);
+            // Use SK-native parameter safety validation
+            await ValidateFunctionParametersAsync(context, correlationId);
             
             await next(context);
         }
@@ -90,53 +81,47 @@ public class SecurityValidationFilter : IPromptRenderFilter, IFunctionInvocation
     }
 
     /// <summary>
-    /// Validate prompt content for potential security issues
+    /// Validate prompt content using SK's built-in prompt safety service
     /// </summary>
-    private Task ValidatePromptContent(PromptRenderContext context, string correlationId)
+    private async Task ValidatePromptContentAsync(PromptRenderContext context, string correlationId)
     {
-        foreach (var argument in context.Arguments)
+        var promptContent = ExtractPromptContent(context);
+        if (string.IsNullOrEmpty(promptContent))
+            return;
+
+        var safetyResult = await _promptSafetyService.ValidatePromptAsync(promptContent, correlationId);
+        
+        if (!safetyResult.IsValid)
         {
-            var value = argument.Value?.ToString();
-            if (string.IsNullOrEmpty(value))
-                continue;
-
-            var valueLower = value.ToLowerInvariant();
+            var issuesText = string.Join("; ", safetyResult.Issues);
+            _logger.LogWarning("Prompt safety validation failed for function {FunctionName}: {Issues} with correlation {CorrelationId}", 
+                context.Function.Name, issuesText, correlationId);
             
-            // Check for prompt injection patterns
-            foreach (var pattern in DangerousPatterns)
+            // For high-risk content, throw security exception
+            if (safetyResult.RiskLevel == PromptRiskLevel.High)
             {
-                if (valueLower.Contains(pattern))
-                {
-                    _logger.LogWarning("Potential prompt injection detected in parameter {ParameterName} for function {FunctionName}: pattern '{Pattern}' with correlation {CorrelationId}", 
-                        argument.Key, context.Function.Name, pattern, correlationId);
-                    
-                    // In a production system, you might want to:
-                    // 1. Sanitize the input
-                    // 2. Reject the request
-                    // 3. Use a more sophisticated ML-based detection
-                    // For now, we just warn and continue
-                }
+                throw new SecurityException($"High-risk prompt content detected: {safetyResult.Recommendation}");
             }
-
-            // Check for excessive length that might indicate injection
-            if (value.Length > 10000)
-            {
-                _logger.LogWarning("Unusually long input detected in parameter {ParameterName} for function {FunctionName}: {Length} characters with correlation {CorrelationId}", 
-                    argument.Key, context.Function.Name, value.Length, correlationId);
-            }
+            
+            // For medium-risk content, log warning but continue
+            _logger.LogWarning("Medium-risk prompt content detected for function {FunctionName}: {Recommendation} with correlation {CorrelationId}", 
+                context.Function.Name, safetyResult.Recommendation, correlationId);
         }
-
-        return Task.CompletedTask;
+        else
+        {
+            _logger.LogDebug("Prompt content passed safety validation for function {FunctionName} with correlation {CorrelationId}", 
+                context.Function.Name, correlationId);
+        }
     }
 
     /// <summary>
-    /// Validate rendered prompt content
+    /// Validate rendered prompt content (placeholder for future SK enhancements)
     /// </summary>
-    private Task ValidateRenderedPrompt(PromptRenderContext context, string correlationId)
+    private Task ValidateRenderedPromptAsync(PromptRenderContext context, string correlationId)
     {
         // The rendered prompt is typically not directly accessible in the context
         // This is a placeholder for future enhancement when SK provides better access
-        // to the rendered prompt content
+        // to the rendered prompt content for post-render validation
         
         _logger.LogDebug("Rendered prompt validation completed for function {FunctionName} with correlation {CorrelationId}", 
             context.Function.Name, correlationId);
@@ -145,27 +130,70 @@ public class SecurityValidationFilter : IPromptRenderFilter, IFunctionInvocation
     }
 
     /// <summary>
-    /// Validate function parameters for security concerns
+    /// Validate function parameters using SK's built-in safety service
     /// </summary>
-    private void ValidateFunctionParameters(FunctionInvocationContext context, string correlationId)
+    private async Task ValidateFunctionParametersAsync(FunctionInvocationContext context, string correlationId)
     {
-        foreach (var parameter in context.Arguments)
+        var safetyResult = await _promptSafetyService.ValidateParametersAsync(
+            context.Arguments, 
+            context.Function.Name, 
+            correlationId);
+        
+        if (!safetyResult.IsValid)
         {
-            var paramName = parameter.Key.ToLowerInvariant();
+            var issuesText = string.Join("; ", safetyResult.Issues);
+            _logger.LogWarning("Parameter safety validation failed for function {FunctionName}: {Issues} with correlation {CorrelationId}", 
+                context.Function.Name, issuesText, correlationId);
             
-            // Check if this parameter contains sensitive information
-            foreach (var sensitiveParam in SensitiveParameters)
+            // For high-risk parameters, throw security exception
+            if (safetyResult.RiskLevel == PromptRiskLevel.High)
             {
-                if (paramName.Contains(sensitiveParam))
+                throw new SecurityException($"High-risk function parameters detected: {safetyResult.Recommendation}");
+            }
+            
+            // For medium-risk parameters, log warning but continue
+            _logger.LogWarning("Medium-risk function parameters detected for function {FunctionName}: {Recommendation} with correlation {CorrelationId}", 
+                context.Function.Name, safetyResult.Recommendation, correlationId);
+        }
+        else
+        {
+            _logger.LogDebug("Function parameters passed safety validation for function {FunctionName} with correlation {CorrelationId}", 
+                context.Function.Name, correlationId);
+        }
+    }
+
+    /// <summary>
+    /// Extract prompt content from context for validation
+    /// </summary>
+    private static string ExtractPromptContent(PromptRenderContext context)
+    {
+        // Extract content from arguments that likely contain prompt text
+        var contentBuilder = new System.Text.StringBuilder();
+        
+        foreach (var argument in context.Arguments)
+        {
+            var value = argument.Value?.ToString();
+            if (!string.IsNullOrEmpty(value))
+            {
+                // Include arguments that might contain prompt content
+                if (IsPromptArgument(argument.Key))
                 {
-                    _logger.LogDebug("Sensitive parameter detected: {ParameterName} for function {FunctionName} with correlation {CorrelationId}", 
-                        parameter.Key, context.Function.Name, correlationId);
-                    
-                    // Ensure sensitive parameters are not logged in detail
-                    // This is handled by the WorkflowExecutionFilter, but we double-check here
-                    break;
+                    contentBuilder.AppendLine(value);
                 }
             }
         }
+        
+        return contentBuilder.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Determine if an argument likely contains prompt content
+    /// </summary>
+    private static bool IsPromptArgument(string argumentName)
+    {
+        var promptKeywords = new[] { "prompt", "input", "content", "text", "message", "query", "request" };
+        var nameLower = argumentName.ToLowerInvariant();
+        
+        return promptKeywords.Any(keyword => nameLower.Contains(keyword));
     }
 }
