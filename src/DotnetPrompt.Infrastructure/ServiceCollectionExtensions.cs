@@ -40,8 +40,8 @@ public static class ServiceCollectionExtensions
         // Register orchestrator (replaces WorkflowExecutorPlugin usage)
         services.AddScoped<IWorkflowOrchestrator, SemanticKernelOrchestrator>();
         
-        // Register basic kernel factory (no MCP yet)
-        services.AddSingleton<IKernelFactory, BasicKernelFactory>();
+        // Register kernel factory (no MCP yet)
+        services.AddSingleton<IKernelFactory, KernelFactory>();
         
         return services;
     }
