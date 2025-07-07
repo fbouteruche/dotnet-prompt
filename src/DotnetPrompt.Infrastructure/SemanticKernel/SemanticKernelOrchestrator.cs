@@ -6,25 +6,30 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
 
 namespace DotnetPrompt.Infrastructure.SemanticKernel;
 
 /// <summary>
-/// Semantic Kernel-powered workflow orchestrator that leverages SK's function calling and conversation management
-/// This is the SK-specific implementation of the framework-agnostic IWorkflowOrchestrator interface
+/// Semantic Kernel-powered workflow orchestrator that leverages SK's native Handlebars templating,
+/// automatic function calling, and conversation management. This is the complete SK-native implementation
+/// per the workflow orchestrator specification.
 /// </summary>
 public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 {
     private readonly IKernelFactory _kernelFactory;
+    private readonly IPromptTemplateFactory _handlebarsFactory;
     private readonly ILogger<SemanticKernelOrchestrator> _logger;
     private readonly Dictionary<string, ChatHistory> _conversationStore = new();
     private Kernel? _kernel;
 
     public SemanticKernelOrchestrator(
         IKernelFactory kernelFactory,
+        IPromptTemplateFactory handlebarsFactory,
         ILogger<SemanticKernelOrchestrator> logger)
     {
         _kernelFactory = kernelFactory;
+        _handlebarsFactory = handlebarsFactory;
         _logger = logger;
     }
 
@@ -37,53 +42,54 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         
         try
         {
-            _logger.LogInformation("Starting SK-powered workflow execution: {WorkflowName}", workflow.Name ?? "unnamed");
+            _logger.LogInformation("Starting SK-native workflow execution with Handlebars templating: {WorkflowName}", 
+                workflow.Name ?? "unnamed");
             
-            // Get or create kernel with required plugins
+            // 1. Get or create kernel with required plugins
             _kernel ??= await _kernelFactory.CreateKernelAsync();
 
-            // Load conversation history for resume capability
-            var workflowId = $"workflow_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+            // 2. Create SK Handlebars template configuration
+            var promptConfig = new PromptTemplateConfig
+            {
+                Template = workflow.Content?.RawMarkdown ?? throw new ArgumentException("Workflow content cannot be empty"),
+                TemplateFormat = "handlebars", // SK native Handlebars support
+                Name = workflow.Name ?? "workflow",
+                Description = workflow.Metadata?.Description ?? "Workflow execution"
+            };
+
+            // 3. Convert context variables to KernelArguments for SK
+            var kernelArgs = ConvertToKernelArguments(context);
+
+            // 4. Create function from template using SK's Handlebars factory
+            var workflowFunction = _kernel.CreateFunctionFromPrompt(promptConfig, _handlebarsFactory);
+
+            // 5. Configure execution settings for automatic function calling
+            var executionSettings = CreateExecutionSettings(workflow);
+
+            // 6. Setup conversation for resume capability
+            var workflowId = GenerateWorkflowId(workflow, context);
             var chatHistory = await GetChatHistoryAsync(workflowId);
 
-            // Execute workflow using SK's automatic function calling
-            var executionSettings = CreateExecutionSettings(workflow, context);
+            _logger.LogInformation("Executing workflow with SK Handlebars templating and automatic function calling");
             
-            // Prepare the workflow prompt with context
-            var workflowPrompt = PrepareWorkflowPrompt(workflow, context);
-            
-            // Add the workflow execution request to chat history
-            chatHistory.AddUserMessage(workflowPrompt);
+            // 7. Execute with SK's automatic function calling and Handlebars rendering
+            var result = await workflowFunction.InvokeAsync(_kernel, kernelArgs, cancellationToken);
 
-            _logger.LogInformation("Executing workflow with SK function calling for {StepCount} logical steps", 
-                ExtractStepCount(workflow));
-
-            // Use SK's chat completion with automatic function calling
-            var chatCompletionService = _kernel.GetRequiredService<IChatCompletionService>();
-            var response = await chatCompletionService.GetChatMessageContentAsync(
-                chatHistory, 
-                executionSettings, 
-                _kernel, 
-                cancellationToken);
-
-            // Add AI response to chat history
-            chatHistory.Add(response);
-
-            // Save conversation state for resume capability
+            // 8. Save conversation state for resume
             await SaveChatHistoryAsync(workflowId, chatHistory);
 
-            _logger.LogInformation("SK workflow execution completed successfully in {Duration}ms", 
+            _logger.LogInformation("SK-native workflow execution completed successfully in {Duration}ms", 
                 executionStopwatch.ElapsedMilliseconds);
 
             return new WorkflowExecutionResult(
                 Success: true,
-                Output: response.Content ?? "Workflow completed successfully",
+                Output: result.ToString(),
                 ErrorMessage: null,
                 ExecutionTime: executionStopwatch.Elapsed);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during SK workflow execution for {WorkflowName}", workflow.Name);
+            _logger.LogError(ex, "Error during SK-native workflow execution for {WorkflowName}", workflow.Name);
             
             return new WorkflowExecutionResult(
                 Success: false,
@@ -104,12 +110,13 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
     {
         try
         {
-            _logger.LogInformation("Validating workflow with SK: {WorkflowName}", workflow.Name ?? "unnamed");
+            _logger.LogInformation("Validating workflow with SK Handlebars template validation: {WorkflowName}", 
+                workflow.Name ?? "unnamed");
 
             var errors = new List<string>();
             var warnings = new List<string>();
 
-            // Validate workflow structure (no AI provider needed)
+            // Validate workflow structure
             if (string.IsNullOrEmpty(workflow.Content?.RawMarkdown))
             {
                 errors.Add("Workflow content cannot be empty");
@@ -121,14 +128,45 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 warnings.Add("No model specified in frontmatter, will use default");
             }
 
-            // Validate provider configuration exists (but don't initialize it)
+            // Validate SK Handlebars template syntax
+            if (!string.IsNullOrEmpty(workflow.Content?.RawMarkdown))
+            {
+                try
+                {
+                    var promptConfig = new PromptTemplateConfig
+                    {
+                        Template = workflow.Content.RawMarkdown,
+                        TemplateFormat = "handlebars",
+                        Name = workflow.Name ?? "validation",
+                        Description = "Template validation"
+                    };
+
+                    // Convert context to kernel arguments for validation
+                    var kernelArgs = ConvertToKernelArguments(context);
+
+                    // Create template to validate syntax (will throw if invalid)
+                    var template = _handlebarsFactory.Create(promptConfig);
+                    
+                    // Test render to validate variable references
+                    await template.RenderAsync(_kernel ?? await _kernelFactory.CreateKernelAsync(), kernelArgs, cancellationToken);
+                    
+                    _logger.LogDebug("SK Handlebars template validation passed");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Handlebars template validation failed: {ex.Message}");
+                    _logger.LogWarning(ex, "SK Handlebars template validation failed");
+                }
+            }
+
+            // Validate provider configuration exists
             var providerName = ExtractProviderFromModel(workflow.Model) ?? "openai";
             if (!IsProviderConfigured(providerName))
             {
                 warnings.Add($"AI provider '{providerName}' may not be properly configured. Ensure required environment variables or configuration are set before execution.");
             }
 
-            // Only create kernel if we need advanced validation and have a provider configured
+            // Advanced validation with kernel (if provider is configured)
             if (context.RequireAdvancedValidation && IsProviderConfigured(providerName))
             {
                 try
@@ -137,7 +175,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                     
                     // Validate available functions in kernel
                     var availableFunctions = _kernel.Plugins.GetFunctionsMetadata();
-                    _logger.LogDebug("Available SK functions: {FunctionCount}", availableFunctions.Count());
+                    _logger.LogDebug("Available SK functions for validation: {FunctionCount}", availableFunctions.Count());
                 }
                 catch (Exception ex)
                 {
@@ -146,13 +184,9 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 }
             }
 
-            // Validate variable references (delegated to existing variable resolver)
-            var workflowPrompt = PrepareWorkflowPrompt(workflow, context);
-            // Additional SK-specific validation could be added here
-
             var isValid = errors.Count == 0;
             
-            _logger.LogInformation("SK workflow validation completed: {IsValid}", isValid);
+            _logger.LogInformation("SK Handlebars workflow validation completed: {IsValid}", isValid);
 
             return new WorkflowValidationResult(
                 IsValid: isValid,
@@ -161,7 +195,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during SK workflow validation");
+            _logger.LogError(ex, "Error during SK Handlebars workflow validation");
             
             return new WorkflowValidationResult(
                 IsValid: false,
@@ -194,7 +228,34 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         await Task.CompletedTask;
     }
 
-    private PromptExecutionSettings CreateExecutionSettings(DotpromptWorkflow workflow, WorkflowExecutionContext context)
+    /// <summary>
+    /// Converts WorkflowExecutionContext variables to KernelArguments for SK
+    /// </summary>
+    private static KernelArguments ConvertToKernelArguments(WorkflowExecutionContext context)
+    {
+        var kernelArgs = new KernelArguments();
+        
+        foreach (var (key, value) in context.Variables)
+        {
+            kernelArgs[key] = value;
+        }
+        
+        return kernelArgs;
+    }
+
+    /// <summary>
+    /// Generates a unique workflow ID for conversation tracking
+    /// </summary>
+    private static string GenerateWorkflowId(DotpromptWorkflow workflow, WorkflowExecutionContext context)
+    {
+        var workflowName = workflow.Name ?? "unnamed";
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        var hash = Math.Abs(string.Join(",", context.Variables.Keys).GetHashCode());
+        
+        return $"workflow_{workflowName}_{timestamp}_{hash}";
+    }
+
+    private PromptExecutionSettings CreateExecutionSettings(DotpromptWorkflow workflow)
     {
         var settings = new OpenAIPromptExecutionSettings
         {
@@ -204,42 +265,6 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         };
 
         return settings;
-    }
-
-    private string PrepareWorkflowPrompt(DotpromptWorkflow workflow, WorkflowExecutionContext context)
-    {
-        var prompt = $"""
-            Execute the following workflow step by step:
-
-            Workflow Name: {workflow.Name ?? "Unnamed Workflow"}
-            
-            Context Variables:
-            {string.Join("\n", context.Variables.Select(kv => $"- {kv.Key}: {kv.Value}"))}
-
-            Workflow Content:
-            {workflow.Content?.RawMarkdown}
-
-            Please execute this workflow using the available functions. Use file operations for reading/writing files, 
-            and ensure all variable substitutions are properly resolved.
-            """;
-
-        return prompt;
-    }
-
-    private static int ExtractStepCount(DotpromptWorkflow workflow)
-    {
-        // Simple heuristic - count logical steps mentioned in content
-        return workflow.Content?.RawMarkdown?.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Count(line => line.TrimStart().StartsWith("- ") || 
-                          line.TrimStart().StartsWith("1.") ||
-                          line.TrimStart().StartsWith("2.") ||
-                          line.TrimStart().StartsWith("3.")) ?? 0;
-    }
-
-    private static int CountFunctionCalls(ChatHistory chatHistory)
-    {
-        // Count function calls in the conversation
-        return chatHistory.Count(message => message.Role == AuthorRole.Tool);
     }
 
     private bool IsProviderConfigured(string providerName)

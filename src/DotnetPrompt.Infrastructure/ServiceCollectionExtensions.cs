@@ -5,6 +5,7 @@ using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
 
 namespace DotnetPrompt.Infrastructure;
 
@@ -26,6 +27,26 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Adds Semantic Kernel orchestrator services with native Handlebars templating
+    /// This replaces custom variable substitution with SK native capabilities
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection for chaining</returns>
+    public static IServiceCollection AddSemanticKernelOrchestrator(this IServiceCollection services)
+    {
+        // Register Handlebars factory for SK native templating
+        services.AddSingleton<IPromptTemplateFactory, HandlebarsPromptTemplateFactory>();
+        
+        // Register orchestrator (replaces WorkflowExecutorPlugin usage)
+        services.AddScoped<IWorkflowOrchestrator, SemanticKernelOrchestrator>();
+        
+        // Register basic kernel factory (no MCP yet)
+        services.AddSingleton<IKernelFactory, BasicKernelFactory>();
+        
+        return services;
+    }
+
+    /// <summary>
     /// Adds AI provider services with framework-agnostic interfaces
     /// Uses Semantic Kernel as the implementation but through agnostic interfaces
     /// </summary>
@@ -33,14 +54,13 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddAiProviderServices(this IServiceCollection services)
     {
-        // Register core AI orchestration services with framework-agnostic interfaces
-        services.AddSingleton<IKernelFactory, KernelFactory>();
-        services.AddSingleton<IWorkflowOrchestrator, SemanticKernelOrchestrator>();
+        // Use the new SK orchestrator instead of the old approach
+        services.AddSemanticKernelOrchestrator();
         
-        // Register SK plugins (implementation detail behind the orchestrator)
-        services.AddTransient<WorkflowExecutorPlugin>();
+        // Register essential SK plugins (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
         services.AddTransient<FileOperationsPlugin>();
         services.AddTransient<ProjectAnalysisPlugin>();
+        // NOTE: WorkflowExecutorPlugin is intentionally excluded - replaced by SK Handlebars templating
         
         // Register SK filters (implementation detail)
         services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
