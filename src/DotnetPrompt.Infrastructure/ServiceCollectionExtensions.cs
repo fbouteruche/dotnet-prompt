@@ -1,5 +1,8 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Infrastructure.Configuration;
+using DotnetPrompt.Infrastructure.Extensions;
+using DotnetPrompt.Infrastructure.Filters;
+using DotnetPrompt.Infrastructure.Middleware;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +26,36 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IConfigurationService, ConfigurationService>();
         
+        return services;
+    }
+
+    /// <summary>
+    /// Adds comprehensive SK error handling and logging filters
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection for chaining</returns>
+    public static IServiceCollection AddSemanticKernelErrorHandling(this IServiceCollection services)
+    {
+        // Register main workflow execution filter (already implements both interfaces)
+        services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
+        services.AddSingleton<IPromptRenderFilter>(serviceProvider => 
+            serviceProvider.GetRequiredService<IFunctionInvocationFilter>() as WorkflowExecutionFilter 
+            ?? throw new InvalidOperationException("WorkflowExecutionFilter must implement IPromptRenderFilter"));
+
+        // Register additional specialized filters
+        services.AddSingleton<IFunctionInvocationFilter, SecurityValidationFilter>();
+        services.AddSingleton<IPromptRenderFilter, SecurityValidationFilter>();
+        services.AddSingleton<IFunctionInvocationFilter, PerformanceMonitoringFilter>();
+        services.AddSingleton<IPromptRenderFilter, PerformanceMonitoringFilter>();
+
+        // Register middleware (as additional filters)
+        services.AddSingleton<IFunctionInvocationFilter, RetryMiddleware>();
+        services.AddSingleton<IFunctionInvocationFilter, CircuitBreakerMiddleware>();
+
+        // Register options for middleware
+        services.AddSingleton<RetryOptions>();
+        services.AddSingleton<CircuitBreakerOptions>();
+
         return services;
     }
 
@@ -57,13 +90,13 @@ public static class ServiceCollectionExtensions
         // Use the new SK orchestrator instead of the old approach
         services.AddSemanticKernelOrchestrator();
         
+        // Add comprehensive error handling and logging
+        services.AddSemanticKernelErrorHandling();
+        
         // Register essential SK plugins (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
         services.AddTransient<FileOperationsPlugin>();
         services.AddTransient<ProjectAnalysisPlugin>();
         // NOTE: WorkflowExecutorPlugin is intentionally excluded - replaced by SK Handlebars templating
-        
-        // Register SK filters (implementation detail)
-        services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
         
         return services;
     }
