@@ -71,6 +71,9 @@ public class CliIntegrationTests
         var workflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
         await File.WriteAllTextAsync(workflowFile, "---\nname: test-workflow\nmodel: gpt-4o\n---\n# Test workflow\n\nThis is a valid test workflow.");
 
+        // Set environment variable to use local provider for integration testing (doesn't require credentials)
+        Environment.SetEnvironmentVariable("DOTNET_PROMPT_PROVIDER", "local");
+
         try
         {
             // Act
@@ -84,6 +87,9 @@ public class CliIntegrationTests
         {
             if (File.Exists(workflowFile))
                 File.Delete(workflowFile);
+            
+            // Clean up environment variable
+            Environment.SetEnvironmentVariable("DOTNET_PROMPT_PROVIDER", null);
         }
     }
 

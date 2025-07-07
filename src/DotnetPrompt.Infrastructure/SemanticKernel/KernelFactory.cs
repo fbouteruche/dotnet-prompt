@@ -99,7 +99,7 @@ public class KernelFactory : IKernelFactory
         // Get provider from hierarchy: parameter > configuration > environment > default
         providerName ??= _configuration["AI:DefaultProvider"] 
                       ?? Environment.GetEnvironmentVariable("DOTNET_PROMPT_PROVIDER")
-                      ?? "openai";
+                      ?? "github";
 
         _logger.LogInformation("Configuring AI provider: {Provider}", providerName);
 
@@ -124,8 +124,8 @@ public class KernelFactory : IKernelFactory
                     ConfigureLocalProvider(builder, configuration);
                     break;
                 default:
-                    _logger.LogWarning("Unknown AI provider: {Provider}, falling back to OpenAI", providerName);
-                    ConfigureOpenAI(builder, configuration);
+                    _logger.LogWarning("Unknown AI provider: {Provider}, falling back to GitHub Models", providerName);
+                    ConfigureGitHubModels(builder, configuration);
                     break;
             }
 
