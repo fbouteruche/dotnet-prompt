@@ -3,6 +3,7 @@ using DotnetPrompt.Infrastructure.Configuration;
 using DotnetPrompt.Infrastructure.Extensions;
 using DotnetPrompt.Infrastructure.Filters;
 using DotnetPrompt.Infrastructure.Middleware;
+using DotnetPrompt.Infrastructure.Progress;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,6 +49,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFunctionInvocationFilter, PerformanceMonitoringFilter>();
         services.AddSingleton<IPromptRenderFilter, PerformanceMonitoringFilter>();
 
+        // Register progress tracking filter if progress manager is available
+        services.AddSingleton<IFunctionInvocationFilter, ProgressTrackingFilter>();
+
         // Register middleware (as additional filters)
         services.AddSingleton<IFunctionInvocationFilter, RetryMiddleware>();
         services.AddSingleton<IFunctionInvocationFilter, CircuitBreakerMiddleware>();
@@ -75,6 +79,21 @@ public static class ServiceCollectionExtensions
         
         // Register kernel factory (no MCP yet)
         services.AddSingleton<IKernelFactory, KernelFactory>();
+        
+        return services;
+    }
+
+    /// <summary>
+    /// Adds progress tracking and resume services using Semantic Kernel
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection for chaining</returns>
+    public static IServiceCollection AddProgressTrackingServices(this IServiceCollection services)
+    {
+        // Register progress manager with in-memory storage for MVP
+        services.AddSingleton<IProgressManager, SkProgressManager>();
+        
+        // Progress tracking filter is already added in AddSemanticKernelErrorHandling
         
         return services;
     }
@@ -121,6 +140,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddConfigurationServices();
         services.AddAiProviderServices();
+        services.AddProgressTrackingServices();
         
         return services;
     }
