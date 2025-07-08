@@ -54,4 +54,39 @@ public static class ExitCodes
     /// Validation error
     /// </summary>
     public const int ValidationError = 9;
+    
+    /// <summary>
+    /// File not found error
+    /// </summary>
+    public const int FileNotFound = 10;
+    
+    /// <summary>
+    /// Feature not available error
+    /// </summary>
+    public const int FeatureNotAvailable = 11;
+    
+    /// <summary>
+    /// No progress found for resume
+    /// </summary>
+    public const int NoProgressFound = 12;
+    
+    /// <summary>
+    /// Workflow execution failed
+    /// </summary>
+    public const int WorkflowExecutionFailed = 13;
+    
+    /// <summary>
+    /// Invalid operation
+    /// </summary>
+    public const int InvalidOperation = 14;
+    
+    /// <summary>
+    /// Ambiguous input requiring clarification
+    /// </summary>
+    public const int AmbiguousInput = 15;
+    
+    /// <summary>
+    /// Unexpected error
+    /// </summary>
+    public const int UnexpectedError = 99;
 }

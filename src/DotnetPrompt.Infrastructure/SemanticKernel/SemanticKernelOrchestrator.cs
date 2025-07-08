@@ -19,6 +19,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 {
     private readonly IKernelFactory _kernelFactory;
     private readonly IPromptTemplateFactory _handlebarsFactory;
+    private readonly IProgressManager? _progressManager;
     private readonly ILogger<SemanticKernelOrchestrator> _logger;
     private readonly Dictionary<string, ChatHistory> _conversationStore = new();
     private Kernel? _kernel;
@@ -26,10 +27,12 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
     public SemanticKernelOrchestrator(
         IKernelFactory kernelFactory,
         IPromptTemplateFactory handlebarsFactory,
-        ILogger<SemanticKernelOrchestrator> logger)
+        ILogger<SemanticKernelOrchestrator> logger,
+        IProgressManager? progressManager = null)
     {
         _kernelFactory = kernelFactory;
         _handlebarsFactory = handlebarsFactory;
+        _progressManager = progressManager;
         _logger = logger;
     }
 
@@ -70,13 +73,34 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             var workflowId = GenerateWorkflowId(workflow, context);
             var chatHistory = await GetChatHistoryAsync(workflowId);
 
+            // 7. Setup progress tracking if available
+            if (_progressManager != null)
+            {
+                // Store workflow hash for compatibility validation
+                var workflowHash = ComputeWorkflowHash(workflow.Content?.RawMarkdown ?? string.Empty);
+                context.SetVariable("workflow_id", workflowId);
+                context.SetVariable("workflow_hash", workflowHash);
+                context.SetVariable("workflow_file", workflow.Name ?? "unknown");
+                
+                // Save initial progress
+                await _progressManager.SaveProgressAsync(workflowId, context, chatHistory, cancellationToken);
+                _logger.LogDebug("Initial progress saved for workflow {WorkflowId}", workflowId);
+            }
+
             _logger.LogInformation("Executing workflow with SK Handlebars templating and automatic function calling");
             
-            // 7. Execute with SK's automatic function calling and Handlebars rendering
+            // 8. Execute with SK's automatic function calling and Handlebars rendering
             var result = await workflowFunction.InvokeAsync(_kernel, kernelArgs, cancellationToken);
 
-            // 8. Save conversation state for resume
+            // 9. Save conversation state for resume
             await SaveChatHistoryAsync(workflowId, chatHistory);
+
+            // 10. Save final progress if available
+            if (_progressManager != null)
+            {
+                await _progressManager.SaveProgressAsync(workflowId, context, chatHistory, cancellationToken);
+                _logger.LogDebug("Final progress saved for workflow {WorkflowId}", workflowId);
+            }
 
             _logger.LogInformation("SK-native workflow execution completed successfully in {Duration}ms", 
                 executionStopwatch.ElapsedMilliseconds);
@@ -228,6 +252,100 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         await Task.CompletedTask;
     }
 
+    public async Task<WorkflowExecutionResult> ResumeWorkflowAsync(string workflowId, DotpromptWorkflow workflow, CancellationToken cancellationToken = default)
+    {
+        var executionStopwatch = Stopwatch.StartNew();
+        
+        try
+        {
+            _logger.LogInformation("Resuming SK-native workflow execution: {WorkflowId}", workflowId);
+
+            if (_progressManager == null)
+            {
+                throw new InvalidOperationException("Progress manager is required for workflow resume functionality");
+            }
+
+            // 1. Load progress from progress manager
+            var progressData = await _progressManager.LoadProgressAsync(workflowId, cancellationToken);
+            if (progressData == null)
+            {
+                throw new InvalidOperationException($"No progress data found for workflow {workflowId}");
+            }
+
+            var (restoredContext, restoredChatHistory) = progressData.Value;
+            if (restoredContext == null || restoredChatHistory == null)
+            {
+                throw new InvalidOperationException($"Invalid progress data for workflow {workflowId}");
+            }
+
+            // 2. Validate workflow compatibility
+            var currentWorkflowContent = workflow.Content?.RawMarkdown ?? string.Empty;
+            var isCompatible = await _progressManager.ValidateWorkflowCompatibilityAsync(workflowId, currentWorkflowContent, cancellationToken);
+            
+            if (!isCompatible)
+            {
+                throw new InvalidOperationException($"Workflow has changed significantly and may not be compatible for resume. WorkflowId: {workflowId}");
+            }
+
+            // 3. Get or create kernel with required plugins
+            _kernel ??= await _kernelFactory.CreateKernelAsync();
+
+            // 4. Restore conversation state
+            _conversationStore[workflowId] = restoredChatHistory;
+            
+            // 5. Add resume message to chat history
+            restoredChatHistory.AddSystemMessage($"Resuming workflow execution from step {restoredContext.CurrentStep} at {DateTimeOffset.UtcNow}");
+
+            // 6. Create SK Handlebars template configuration
+            var promptConfig = new PromptTemplateConfig
+            {
+                Template = currentWorkflowContent,
+                TemplateFormat = "handlebars",
+                Name = workflow.Name ?? "workflow",
+                Description = workflow.Metadata?.Description ?? "Resumed workflow execution"
+            };
+
+            // 7. Convert restored context variables to KernelArguments for SK
+            var kernelArgs = ConvertToKernelArguments(restoredContext);
+
+            // 8. Create function from template using SK's Handlebars factory
+            var workflowFunction = _kernel.CreateFunctionFromPrompt(promptConfig, _handlebarsFactory);
+
+            // 9. Configure execution settings
+            var executionSettings = CreateExecutionSettings(workflow);
+
+            _logger.LogInformation("Resuming workflow execution with restored state");
+            
+            // 10. Execute with SK's automatic function calling and Handlebars rendering
+            var result = await workflowFunction.InvokeAsync(_kernel, kernelArgs, cancellationToken);
+
+            // 11. Save conversation state and progress
+            await SaveChatHistoryAsync(workflowId, restoredChatHistory);
+            await _progressManager.SaveProgressAsync(workflowId, restoredContext, restoredChatHistory, cancellationToken);
+
+            _logger.LogInformation("SK-native workflow resume completed successfully in {Duration}ms", 
+                executionStopwatch.ElapsedMilliseconds);
+
+            return new WorkflowExecutionResult(
+                Success: true,
+                Output: result.ToString(),
+                ErrorMessage: null,
+                ExecutionTime: executionStopwatch.Elapsed
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resume SK-native workflow execution: {WorkflowId}", workflowId);
+            
+            return new WorkflowExecutionResult(
+                Success: false,
+                Output: null,
+                ErrorMessage: ex.Message,
+                ExecutionTime: executionStopwatch.Elapsed
+            );
+        }
+    }
+
     /// <summary>
     /// Converts WorkflowExecutionContext variables to KernelArguments for SK
     /// </summary>
@@ -300,5 +418,15 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             var m when m.StartsWith("llama") => "local",
             _ => "openai" // Default to OpenAI
         };
+    }
+
+    /// <summary>
+    /// Compute hash of workflow content for compatibility validation
+    /// </summary>
+    private static string ComputeWorkflowHash(string workflowContent)
+    {
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(workflowContent));
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 }
