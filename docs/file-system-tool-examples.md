@@ -6,20 +6,24 @@ This document demonstrates the enhanced File System Tool (FileSystemPlugin) func
 
 ### Reading Files
 ```yaml
-# File read function
+# File read function with snake_case parameters (aligned with specification)
 {{invoke_tool: file_read
-  filePath: "./config/settings.json"
+  file_path: "./config/settings.json"
   encoding: "utf-8"
+  max_size_mb: 10
+  max_lines: 100
+  skip_lines: 0
 }}
 ```
 
 ### Writing Files
 ```yaml
-# File write function with directory creation
+# File write function with directory creation and backup support
 {{invoke_tool: file_write
-  filePath: "./output/result.txt"
+  file_path: "./output/result.txt"
   content: "Generated content"
-  createDirectories: true
+  encoding: "utf-8"
+  create_backup: true
   overwrite: true
 }}
 ```
@@ -28,7 +32,7 @@ This document demonstrates the enhanced File System Tool (FileSystemPlugin) func
 ```yaml
 # File existence check
 {{invoke_tool: file_exists
-  filePath: "./data/input.csv"
+  file_path: "./data/input.csv"
 }}
 ```
 
@@ -36,9 +40,10 @@ This document demonstrates the enhanced File System Tool (FileSystemPlugin) func
 
 ### Creating Directories
 ```yaml
-# Directory creation
+# Directory creation with recursive support
 {{invoke_tool: create_directory
-  directoryPath: "./output/reports"
+  directory_path: "./output/reports"
+  recursive: true
 }}
 ```
 
@@ -46,18 +51,18 @@ This document demonstrates the enhanced File System Tool (FileSystemPlugin) func
 ```yaml
 # List all files and directories
 {{invoke_tool: list_directory
-  directoryPath: "./src"
+  directory_path: "./src"
   pattern: "*"
   recursive: false
-  includeHidden: false
+  include_hidden: false
 }}
 
 # List only C# source files recursively
 {{invoke_tool: list_directory
-  directoryPath: "./src"
+  directory_path: "./src"
   pattern: "*.cs"
   recursive: true
-  maxDepth: 10
+  max_depth: 10
 }}
 ```
 
@@ -67,8 +72,8 @@ This document demonstrates the enhanced File System Tool (FileSystemPlugin) func
 ```yaml
 # Copy file with safety controls
 {{invoke_tool: copy_file
-  sourcePath: "./templates/template.txt"
-  destinationPath: "./output/generated.txt"
+  source_path: "./templates/template.txt"
+  destination_path: "./output/generated.txt"
   overwrite: false
 }}
 ```
@@ -77,7 +82,7 @@ This document demonstrates the enhanced File System Tool (FileSystemPlugin) func
 ```yaml
 # Get detailed file metadata
 {{invoke_tool: get_file_info
-  filePath: "./data/large-file.json"
+  file_path: "./data/large-file.json"
 }}
 ```
 

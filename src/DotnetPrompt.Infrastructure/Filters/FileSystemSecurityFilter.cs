@@ -108,8 +108,8 @@ public class FileSystemSecurityFilter : IFunctionInvocationFilter
     /// </summary>
     private Task ValidateFileAccess(FunctionInvocationContext context, string workingDirectory, string correlationId)
     {
-        // Extract file path from common parameter names
-        var filePath = GetPathParameter(context, "filePath", "path", "file_path", "source_path", "destination_path");
+        // Extract file path from common parameter names (including snake_case variants)
+        var filePath = GetPathParameter(context, "file_path", "filePath", "path", "source_path", "sourcePath", "destination_path", "destinationPath");
         
         if (string.IsNullOrEmpty(filePath))
         {
@@ -134,7 +134,7 @@ public class FileSystemSecurityFilter : IFunctionInvocationFilter
     /// </summary>
     private Task ValidateDirectoryAccess(FunctionInvocationContext context, string workingDirectory, string correlationId)
     {
-        var directoryPath = GetPathParameter(context, "directoryPath", "directory_path", "path");
+        var directoryPath = GetPathParameter(context, "directory_path", "directoryPath", "path");
         
         if (string.IsNullOrEmpty(directoryPath))
         {
@@ -176,7 +176,7 @@ public class FileSystemSecurityFilter : IFunctionInvocationFilter
             context.Arguments.TryGetValue("overwrite", out var overwriteValue) && 
             overwriteValue is false)
         {
-            var filePath = GetPathParameter(context, "filePath", "path", "file_path");
+            var filePath = GetPathParameter(context, "file_path", "filePath", "path");
             if (!string.IsNullOrEmpty(filePath))
             {
                 var workingDirectory = _securityPolicy.GetWorkingDirectory(_options.WorkingDirectoryContext);

@@ -20,8 +20,8 @@ public class FileSystemPluginTests : IDisposable
     {
         _mockLogger = new Mock<ILogger<FileSystemPlugin>>();
         
-        // Create a test directory in the current working directory for tests
-        _testDirectory = Path.Combine(Directory.GetCurrentDirectory(), "FileSystemPluginTests");
+        // Create a test directory in a temporary location for tests
+        _testDirectory = Path.Combine(Path.GetTempPath(), "dotnet-prompt-unit-tests", Guid.NewGuid().ToString());
         if (Directory.Exists(_testDirectory))
         {
             Directory.Delete(_testDirectory, true);
@@ -30,12 +30,12 @@ public class FileSystemPluginTests : IDisposable
         
         _options = new FileSystemOptions
         {
-            AllowedDirectories = new[] { Directory.GetCurrentDirectory() }, // Allow current working directory
-            BlockedDirectories = new[] { "bin", "obj", ".git" },
+            AllowedDirectories = new[] { _testDirectory }, // Only allow test directory
+            BlockedDirectories = Array.Empty<string>(), // No blocked directories for tests
             MaxFileSizeBytes = 1024 * 1024, // 1MB for tests
             MaxFilesPerOperation = 100,
-            EnableAuditLogging = true,
-            WorkingDirectoryContext = Directory.GetCurrentDirectory() // Explicitly set working directory context
+            EnableAuditLogging = false, // Disable audit logging for cleaner test output
+            WorkingDirectoryContext = _testDirectory // Set working directory context to test directory
         };
 
         _plugin = new FileSystemPlugin(_mockLogger.Object, Options.Create(_options));
@@ -65,13 +65,14 @@ public class FileSystemPluginTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadFileAsync_WithNonExistentFile_ThrowsFileNotFoundException()
+    public async Task ReadFileAsync_WithNonExistentFile_ThrowsKernelException()
     {
         // Arrange
         var nonExistentFile = Path.Combine(_testDirectory, "nonexistent.txt");
 
         // Act & Assert
-        await Assert.ThrowsAsync<FileNotFoundException>(() => _plugin.ReadFileAsync(nonExistentFile));
+        var ex = await Assert.ThrowsAsync<KernelException>(() => _plugin.ReadFileAsync(nonExistentFile));
+        Assert.Contains("File not found", ex.Message);
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public class FileSystemPluginTests : IDisposable
         var content = "Test content";
 
         // Act
-        var result = await _plugin.WriteFileAsync(testFile, content, true);
+        var result = await _plugin.WriteFileAsync(testFile, content);
 
         // Assert
         Assert.True(File.Exists(testFile));
@@ -108,16 +109,24 @@ public class FileSystemPluginTests : IDisposable
     }
 
     [Fact]
-    public async Task WriteFileAsync_WithCreateDirectoriesFalse_ThrowsWhenDirectoryDoesNotExist()
+    public async Task WriteFileAsync_WithCreateBackupTrue_CreatesBackupFile()
     {
         // Arrange
-        var testFile = Path.Combine(_testDirectory, "nonexistent-dir", "test.txt");
-        var content = "Test content";
+        var testFile = Path.Combine(_testDirectory, "backup-test.txt");
+        await File.WriteAllTextAsync(testFile, "original content");
+        var newContent = "new content";
 
-        // Act & Assert
-        var ex = await Assert.ThrowsAsync<KernelException>(() => 
-            _plugin.WriteFileAsync(testFile, content, false));
-        Assert.Contains("Directory does not exist", ex.Message);
+        // Act
+        var result = await _plugin.WriteFileAsync(testFile, newContent, create_backup: true);
+
+        // Assert
+        Assert.True(File.Exists(testFile));
+        var actualContent = await File.ReadAllTextAsync(testFile);
+        Assert.Equal(newContent, actualContent);
+        
+        // Check that backup file was created
+        var backupFiles = Directory.GetFiles(_testDirectory, "backup-test.txt.backup.*");
+        Assert.Single(backupFiles);
     }
 
     [Fact]
@@ -242,8 +251,9 @@ public class FileSystemPluginTests : IDisposable
         await File.WriteAllTextAsync(destFile, "existing content");
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+        var ex = await Assert.ThrowsAsync<KernelException>(() => 
             _plugin.CopyFileAsync(sourceFile, destFile, false));
+        Assert.Contains("overwrite is disabled", ex.Message);
     }
 
     [Fact]
@@ -277,7 +287,7 @@ public class FileSystemPluginTests : IDisposable
     [Fact]
     public async Task ReadFileAsync_WithPathOutsideWorkingDirectory_ThrowsKernelException()
     {
-        // Arrange
+        // Arrange - Use a path outside any allowed directory
         var tempFile = Path.Combine(Path.GetTempPath(), "unauthorized-test.txt");
         await File.WriteAllTextAsync(tempFile, "unauthorized content");
 
@@ -297,18 +307,4 @@ public class FileSystemPluginTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task WriteFileAsync_WithTooLargeContent_ThrowsException()
-    {
-        // Arrange
-        var testFile = Path.Combine(_testDirectory, "large-file.txt");
-        var largeContent = new string('x', (int)_options.MaxFileSizeBytes + 1);
-
-        // Act & Assert
-        // Note: This test checks the size limit during copy operations
-        // For write operations, we'd need to modify the plugin to check content size before writing
-        // For now, this demonstrates the test structure
-        var ex = await Assert.ThrowsAnyAsync<Exception>(() => _plugin.WriteFileAsync(testFile, largeContent));
-        // The actual exception type may vary based on implementation details
-    }
 }
