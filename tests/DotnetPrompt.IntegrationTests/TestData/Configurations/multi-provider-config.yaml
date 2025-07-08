@@ -1,0 +1,98 @@
+providers:
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4o"
+    base_url: "https://api.openai.com/v1"
+    organization: "${OPENAI_ORG_ID}"
+    
+  github:
+    api_key: "${GITHUB_TOKEN}"
+    model: "gpt-4o"
+    base_url: "https://models.inference.ai.azure.com"
+    
+  azure:
+    api_key: "${AZURE_OPENAI_API_KEY}"
+    endpoint: "${AZURE_OPENAI_ENDPOINT}"
+    model: "gpt-4o"
+    deployment_name: "${AZURE_OPENAI_DEPLOYMENT}"
+    api_version: "2024-08-01-preview"
+    
+  local:
+    base_url: "${LOCAL_LLM_ENDPOINT}"
+    model: "${LOCAL_LLM_MODEL}"
+    api_key: "not-required"
+
+default:
+  provider: "github"
+  model: "gpt-4o"
+  fallback_providers: ["openai", "azure"]
+
+logging:
+  level: "Debug"
+  console: true
+  file: true
+  file_path: "./.dotnet-prompt/logs/app.log"
+  structured: true
+  include_scopes: true
+
+performance:
+  max_concurrent_requests: 5
+  request_timeout: 120
+  retry_attempts: 3
+  retry_delay: 2
+
+cache:
+  enabled: true
+  directory: "./.dotnet-prompt/cache"
+  max_size: "500MB"
+  ttl: "7d"
+  compression: true
+
+progress:
+  enabled: true
+  directory: "./.dotnet-prompt/progress"
+  retention_days: 30
+  auto_cleanup: true
+  max_files: 1000
+
+security:
+  enable_sandboxing: true
+  allowed_hosts: ["api.openai.com", "models.inference.ai.azure.com"]
+  blocked_patterns: ["password", "secret", "token"]
+  
+error_handling:
+  max_retries: 3
+  fallback_provider: "github"
+  graceful_degradation: true
+
+tools:
+  file_system:
+    allowed_directories: ["./", "../", "/tmp"]
+    blocked_directories: ["/etc", "/var", "C:\\Windows", "C:\\Program Files"]
+    max_file_size: "50MB"
+    max_files_per_operation: 1000
+    enable_audit: true
+    audit_log_path: "./.dotnet-prompt/audit/file-ops.log"
+    working_directory_context: "./"
+
+  project_analysis:
+    include_dependencies: true
+    include_tests: true
+    include_documentation: true
+    max_project_size: "1GB"
+    exclude_patterns: 
+      - "bin/**"
+      - "obj/**" 
+      - "node_modules/**"
+      - ".git/**"
+      - "packages/**"
+    analysis_depth: "comprehensive"
+    cache_analysis_results: true
+
+  sub_workflow:
+    max_depth: 10
+    timeout: 300
+    enable_parallel: true
+    max_concurrent: 3
+    parameter_validation: true
+    result_caching: true
