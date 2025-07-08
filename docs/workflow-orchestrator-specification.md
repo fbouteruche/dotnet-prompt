@@ -260,7 +260,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             return Task.FromResult(history);
         }
 
-        // TODO: Load from persistent storage via Vector Store
+        // TODO: Load from persistent file-based progress storage
         return Task.FromResult(new ChatHistory());
     }
 
@@ -268,7 +268,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
     {
         _conversationStore[workflowId] = chatHistory;
         
-        // TODO: Persist to Vector Store for durable storage
+        // TODO: Persist to progress files for durable storage
         _logger.LogDebug("Saved chat history for workflow {WorkflowId} with {MessageCount} messages", 
             workflowId, chatHistory.Count);
         
@@ -401,8 +401,8 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 
 ### 3. **Conversation State Management**
 - SK ChatHistory for persistent conversation state
-- Resume functionality through conversation persistence
-- Vector Store integration for durable storage
+- Resume functionality through file-based progress persistence
+- Progress file storage for durable workflow state
 - Workflow-specific conversation isolation
 
 ### 4. **Comprehensive Validation**
@@ -415,7 +415,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 ### 5. **Performance Optimization**
 - Lazy kernel initialization
 - Function result caching via SK mechanisms
-- Vector Store for intelligent caching
+- File-based progress storage for efficient state management
 - Efficient conversation state serialization
 
 ## Integration Points
@@ -436,8 +436,8 @@ public static IServiceCollection AddSemanticKernelOrchestrator(this IServiceColl
     // Register kernel factory
     services.AddSingleton<IKernelFactory, KernelFactory>();
     
-    // Register Vector Store for conversation persistence
-    services.AddSingleton<IVectorStore, InMemoryVectorStore>(); // or your preferred implementation
+    // Register progress manager for file-based persistence
+    services.AddSingleton<IProgressManager, FileProgressManager>();
     
     return services;
 }
