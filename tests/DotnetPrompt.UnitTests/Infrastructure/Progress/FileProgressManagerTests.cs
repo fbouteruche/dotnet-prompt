@@ -8,17 +8,19 @@ using Xunit;
 namespace DotnetPrompt.UnitTests.Infrastructure.Progress;
 
 /// <summary>
-/// Unit tests for SkProgressManager
+/// Unit tests for FileProgressManager
 /// </summary>
-public class SkProgressManagerTests
+public class FileProgressManagerTests : IDisposable
 {
-    private readonly SkProgressManager _progressManager;
-    private readonly NullLogger<SkProgressManager> _logger;
+    private readonly FileProgressManager _progressManager;
+    private readonly NullLogger<FileProgressManager> _logger;
+    private readonly string _tempDirectory;
 
-    public SkProgressManagerTests()
+    public FileProgressManagerTests()
     {
-        _logger = new NullLogger<SkProgressManager>();
-        _progressManager = new SkProgressManager(_logger);
+        _logger = new NullLogger<FileProgressManager>();
+        _tempDirectory = Path.Combine(Path.GetTempPath(), $"dotnet-prompt-tests-{Guid.NewGuid()}");
+        _progressManager = new FileProgressManager(_logger, _tempDirectory);
     }
 
     [Fact]
@@ -212,12 +214,23 @@ public class SkProgressManagerTests
     }
 
     /// <summary>
-    /// Helper method to compute hash for testing (mirrors the one in SkProgressManager)
+    /// Helper method to compute hash for testing (mirrors the one in FileProgressManager)
     /// </summary>
     private static string ComputeTestHash(string content)
     {
         using var sha256 = System.Security.Cryptography.SHA256.Create();
         var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(content));
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Clean up test directory
+    /// </summary>
+    public void Dispose()
+    {
+        if (Directory.Exists(_tempDirectory))
+        {
+            Directory.Delete(_tempDirectory, recursive: true);
+        }
     }
 }
