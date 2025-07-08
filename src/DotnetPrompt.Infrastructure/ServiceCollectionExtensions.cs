@@ -3,6 +3,7 @@ using DotnetPrompt.Infrastructure.Configuration;
 using DotnetPrompt.Infrastructure.Extensions;
 using DotnetPrompt.Infrastructure.Filters;
 using DotnetPrompt.Infrastructure.Middleware;
+using DotnetPrompt.Infrastructure.Models;
 using DotnetPrompt.Infrastructure.Progress;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
@@ -27,6 +28,20 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IConfigurationService, ConfigurationService>();
         
+        // Add file system options configuration
+        services.Configure<FileSystemOptions>(options =>
+        {
+            // Default configuration - will be overridden by appsettings.json or CLI parameters
+            options.AllowedDirectories = Array.Empty<string>(); // Default to working directory
+            options.BlockedDirectories = new[] { "bin", "obj", ".git", "node_modules" };
+            options.AllowedExtensions = Array.Empty<string>(); // Allow all by default
+            options.BlockedExtensions = new[] { ".exe", ".dll", ".so", ".dylib" };
+            options.MaxFileSizeBytes = 10 * 1024 * 1024; // 10MB
+            options.MaxFilesPerOperation = 1000;
+            options.RequireConfirmationForDelete = true;
+            options.EnableAuditLogging = true;
+        });
+        
         return services;
     }
 
@@ -48,6 +63,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPromptRenderFilter, SecurityValidationFilter>();
         services.AddSingleton<IFunctionInvocationFilter, PerformanceMonitoringFilter>();
         services.AddSingleton<IPromptRenderFilter, PerformanceMonitoringFilter>();
+        
+        // Register file system security filter
+        services.AddSingleton<IFunctionInvocationFilter, FileSystemSecurityFilter>();
 
         // Register progress tracking filter if progress manager is available
         services.AddSingleton<IFunctionInvocationFilter, ProgressTrackingFilter>();
@@ -113,7 +131,7 @@ public static class ServiceCollectionExtensions
         services.AddSemanticKernelErrorHandling();
         
         // Register essential SK plugins (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
-        services.AddTransient<FileOperationsPlugin>();
+        services.AddTransient<FileSystemPlugin>();
         services.AddTransient<ProjectAnalysisPlugin>();
         // NOTE: WorkflowExecutorPlugin is intentionally excluded - replaced by SK Handlebars templating
         
