@@ -133,6 +133,7 @@ public static class ServiceCollectionExtensions
         // Register essential SK plugins (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
         services.AddTransient<FileSystemPlugin>();
         services.AddTransient<ProjectAnalysisPlugin>();
+        services.AddTransient<SubWorkflowPlugin>();
         // NOTE: WorkflowExecutorPlugin is intentionally excluded - replaced by SK Handlebars templating
         
         return services;

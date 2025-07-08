@@ -144,7 +144,8 @@ public class DotpromptValidator
                 "build-test", 
                 "file-system",
                 "git-operations",
-                "document-generation"
+                "document-generation",
+                "sub-workflow"
             };
 
             foreach (var tool in workflow.Tools)
