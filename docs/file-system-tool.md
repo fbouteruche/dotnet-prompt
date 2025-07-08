@@ -139,24 +139,73 @@ interface FileOperationResult {
 
 ## Security Model
 
+### Path Resolution Behavior
+
+#### Relative Path Handling
+- All relative paths are resolved against the working directory context
+- Working directory is determined by CLI `--context` parameter or current execution directory
+- Path traversal attempts (`../`) are validated against allowed directory boundaries
+
+#### Absolute Path Validation
+- Absolute paths must fall within configured `allowedDirectories`
+- System directories are blocked by default unless explicitly configured
+- Cross-platform path normalization ensures consistent behavior
+
+#### Example Path Resolution
+```typescript
+// Working directory: /home/user/project
+// Allowed directories: ["/home/user/project"]
+
+"./src/Program.cs"           → "/home/user/project/src/Program.cs" ✅
+"../other-project/file.cs"   → "/home/user/other-project/file.cs" ❌ (outside boundary)
+"/tmp/temp.json"             → "/tmp/temp.json" ❌ (not in allowed directories)
+
+// With extended configuration:
+// Allowed directories: ["/home/user/project", "/shared/templates"]
+"/shared/templates/base.cs"  → "/shared/templates/base.cs" ✅
+```
+
+### Default Security Boundary
+**Working Directory Context**: The file system tool operates within the working directory context by default. The working directory is determined by:
+1. CLI `--context` parameter if specified
+2. Current directory where `dotnet prompt` executes
+3. Configurable via `allowedDirectories` in tool configuration
+
+This provides security by default while maintaining flexibility for legitimate use cases that require broader file system access.
+
 ### Path Validation and Sandboxing
-- All paths validated against allowed directories
+- All paths validated against allowed directories (default: working directory)
 - Parent directory traversal (`../`) restrictions
 - Absolute path validation and conversion
 - System directory access prevention
+- Relative paths resolved against working directory context
 
 ### Access Control Policies
 ```typescript
 interface FileSystemSecurityPolicy {
-    allowedDirectories: string[];
-    blockedDirectories: string[];
-    allowedExtensions: string[];
-    blockedExtensions: string[];
-    maxFileSize: number;
-    maxFilesPerOperation: number;
-    requireConfirmationForDelete: boolean;
-    enableAuditLogging: boolean;
+    allowedDirectories: string[];      // Default: [workingDirectory]
+    blockedDirectories: string[];      // Additional restrictions within allowed dirs
+    allowedExtensions: string[];       // File type allowlist (empty = all allowed)
+    blockedExtensions: string[];       // File type blocklist
+    maxFileSize: number;               // Maximum file size in bytes
+    maxFilesPerOperation: number;      // Bulk operation limits
+    requireConfirmationForDelete: boolean;  // Safety for destructive operations
+    enableAuditLogging: boolean;       // Track all file operations
 }
+```
+
+**Default Policy:**
+```typescript
+const defaultPolicy: FileSystemSecurityPolicy = {
+    allowedDirectories: [process.cwd()],  // Working directory only
+    blockedDirectories: ["bin", "obj", ".git", "node_modules"],
+    allowedExtensions: [],  // All extensions allowed by default
+    blockedExtensions: [".exe", ".dll", ".so", ".dylib"],  // Binary executables
+    maxFileSize: 10 * 1024 * 1024,  // 10MB
+    maxFilesPerOperation: 1000,
+    requireConfirmationForDelete: true,
+    enableAuditLogging: true
+};
 ```
 
 ## Clarifying Questions
@@ -168,10 +217,10 @@ interface FileSystemSecurityPolicy {
 - Should there be support for file attributes and permissions management?
 
 ### 2. Security and Sandboxing
-- What should be the default security boundaries (workflow directory only)?
-- How should the tool handle requests for system directories?
-- Should there be configurable security policies per workflow?
-- How should sensitive file detection and protection work?
+- ✅ **Default security boundary**: Working directory context (CLI `--context` or current directory)
+- How should the tool handle requests for system directories? (Block by default, require explicit configuration)
+- Should there be configurable security policies per workflow? (Yes, via tool configuration)
+- How should sensitive file detection and protection work? (File extension and content-based detection)
 
 ### 3. Binary File Handling
 - How should binary files be detected and handled?
@@ -223,34 +272,19 @@ interface FileSystemSecurityPolicy {
 
 ## Example Usage Scenarios
 
-### Configuration File Processing
+### Basic File Operations (Working Directory Context)
 ```markdown
-Read and process application configuration:
-
+# Read configuration file (relative to working directory)
 {{invoke_tool: read_file
   file_path: "./appsettings.json"
   encoding: "utf-8"
 }}
 
+# Write file with backup (within working directory)
 {{invoke_tool: write_file
   file_path: "./appsettings.Development.json"
   content: "{{updated_config}}"
   create_backup: true
-}}
-```
-
-### Code Generation
-```markdown
-Generate new source files:
-
-{{invoke_tool: create_directory
-  directory_path: "./Generated/Models"
-}}
-
-{{invoke_tool: write_file
-  file_path: "./Generated/Models/{{class_name}}.cs"
-  content: "{{generated_code}}"
-  overwrite: false
 }}
 ```
 
@@ -266,11 +300,86 @@ Find all C# source files for analysis:
 }}
 ```
 
+### Code Generation with Directory Structure
+```markdown
+Generate new source files:
+
+{{invoke_tool: create_directory
+  directory_path: "./Generated/Models"
+}}
+
+{{invoke_tool: write_file
+  file_path: "./Generated/Models/{{class_name}}.cs"
+  content: "{{generated_code}}"
+  overwrite: false
+}}
+```
+
+### Extended Access Configuration
+```yaml
+# dotnet-prompt.yaml - Configure broader access when needed
+tool_configuration:
+  file_system:
+    allowed_directories:
+      - "."                           # Working directory (default)
+      - "../shared-resources"         # Relative path to shared resources
+      - "/opt/templates"              # Absolute path for system templates
+      - "${HOME}/dotnet-templates"    # Environment variable expansion
+    blocked_directories:
+      - "./bin"
+      - "./obj"
+      - "./.git"
+      - "./node_modules"
+    allowed_extensions:
+      - ".cs"
+      - ".json"
+      - ".yaml"
+      - ".md"
+    blocked_extensions:
+      - ".exe"
+      - ".dll"
+      - ".so"
+    max_file_size: 10485760  # 10MB
+    require_confirmation_for_delete: true
+    enable_audit_logging: true
+```
+
 ## Next Steps
 
-1. Answer the clarifying questions above
-2. Define the complete security policy framework
-3. Specify error handling and recovery mechanisms
-4. Design the file system monitoring capabilities
-5. Create performance optimization strategies
-6. Implement the Semantic Kernel plugin interface
+1. ✅ **Define default security boundary** - Working directory context established
+2. **Implement path validation and sandboxing logic**
+3. **Create configuration integration with dotnet-prompt hierarchy**
+4. **Design error handling and recovery mechanisms** 
+5. **Implement file system monitoring capabilities** (future enhancement)
+6. **Create performance optimization strategies**
+7. **Implement the Semantic Kernel plugin interface**
+
+## Implementation Guidance
+
+### Security-First Architecture
+```csharp
+public class FileSystemPlugin
+{
+    private readonly FileSystemSecurityPolicy _policy;
+    private readonly string _workingDirectory;
+    
+    private bool IsPathAllowed(string requestedPath)
+    {
+        var resolvedPath = Path.IsPathRooted(requestedPath) 
+            ? requestedPath 
+            : Path.Combine(_workingDirectory, requestedPath);
+            
+        var normalizedPath = Path.GetFullPath(resolvedPath);
+        
+        return _policy.AllowedDirectories.Any(allowedDir =>
+            normalizedPath.StartsWith(Path.GetFullPath(allowedDir), 
+                                    StringComparison.OrdinalIgnoreCase));
+    }
+}
+```
+
+### Configuration Integration
+- Integrate with dotnet-prompt's 4-level configuration hierarchy
+- Support environment variable expansion in paths
+- Provide sensible defaults for .NET development workflows
+- Enable per-workflow security policy overrides when explicitly configured
