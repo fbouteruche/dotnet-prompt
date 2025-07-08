@@ -91,6 +91,7 @@ public class Program
         // Register commands
         services.AddScoped<RunCommand>();
         services.AddScoped<ConfigCommand>();
+        services.AddScoped<ResumeCommand>();
 
         return services;
     }
@@ -122,6 +123,9 @@ public class Program
 
         var configCommand = serviceProvider.GetRequiredService<ConfigCommand>();
         rootCommand.AddCommand(configCommand);
+
+        var resumeCommand = serviceProvider.GetRequiredService<ResumeCommand>();
+        rootCommand.AddCommand(resumeCommand);
 
         return rootCommand;
     }
