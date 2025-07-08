@@ -1,8 +1,10 @@
 using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Infrastructure.Models;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Moq;
 using Xunit;
@@ -33,12 +35,13 @@ public class KernelFactoryTests
             .Returns(_mockFilter.Object);
 
         // Mock plugins with default loggers
-        var mockFileOps = new DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileOperationsPlugin(
-            Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileOperationsPlugin>>());
+        var mockFileOps = new DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin(
+            Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin>>(),
+            Options.Create(new FileSystemOptions()));
         var mockProjectAnalysis = new DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin(
             Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin>>());
 
-        _mockServiceProvider.Setup(x => x.GetService(typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileOperationsPlugin)))
+        _mockServiceProvider.Setup(x => x.GetService(typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin)))
             .Returns(mockFileOps);
         _mockServiceProvider.Setup(x => x.GetService(typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin)))
             .Returns(mockProjectAnalysis);
@@ -197,7 +200,7 @@ public class KernelFactoryTests
         Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
         var pluginTypes = new[]
         {
-            typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileOperationsPlugin),
+            typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin),
             typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin)
         };
 

@@ -108,7 +108,7 @@ public class ServiceCollectionExtensionsTests
         Assert.NotNull(serviceProvider.GetService<IWorkflowOrchestrator>());
         
         // Verify plugins are registered (but not WorkflowExecutorPlugin)
-        Assert.NotNull(serviceProvider.GetService<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileOperationsPlugin>());
+        Assert.NotNull(serviceProvider.GetService<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin>());
         Assert.NotNull(serviceProvider.GetService<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin>());
         
         // Verify filters are registered

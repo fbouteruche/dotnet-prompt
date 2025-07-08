@@ -54,7 +54,7 @@ public class KernelFactory : IKernelFactory
         // Add all built-in workflow plugins by default (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
         var pluginTypes = new[]
         {
-            typeof(Plugins.FileOperationsPlugin),
+            typeof(Plugins.FileSystemPlugin),
             typeof(Plugins.ProjectAnalysisPlugin)
         };
 
