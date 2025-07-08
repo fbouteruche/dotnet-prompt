@@ -84,14 +84,14 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds progress tracking and resume services using Semantic Kernel
+    /// Adds progress tracking and resume services using file-based storage with Semantic Kernel
     /// </summary>
     /// <param name="services">The service collection</param>
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddProgressTrackingServices(this IServiceCollection services)
     {
-        // Register progress manager with in-memory storage for MVP
-        services.AddSingleton<IProgressManager, SkProgressManager>();
+        // Register file-based progress manager for simple, reliable persistence
+        services.AddSingleton<IProgressManager, FileProgressManager>();
         
         // Progress tracking filter is already added in AddSemanticKernelErrorHandling
         
