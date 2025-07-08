@@ -20,6 +20,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- SK-Native Integration Testing Dependencies -->
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
   </ItemGroup>
 
   <ItemGroup>

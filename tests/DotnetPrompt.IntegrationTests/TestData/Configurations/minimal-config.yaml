@@ -1,0 +1,40 @@
+providers:
+  github:
+    api_key: "${GITHUB_TOKEN}"
+    model: "gpt-4o"
+    base_url: "https://models.inference.ai.azure.com"
+
+default:
+  provider: "github"
+  model: "gpt-4o"
+
+logging:
+  level: "Information"
+  console: true
+  file: false
+
+cache:
+  enabled: true
+  directory: "./.dotnet-prompt/cache"
+  max_size: "100MB"
+  ttl: "24h"
+
+timeout: 300
+
+tools:
+  file_system:
+    allowed_directories: ["./", "../"]
+    blocked_directories: ["/etc", "/var", "C:\\Windows"]
+    max_file_size: "10MB"
+    enable_audit: false
+
+  project_analysis:
+    include_dependencies: true
+    include_tests: true
+    max_project_size: "500MB"
+    exclude_patterns: ["bin/**", "obj/**", "node_modules/**"]
+
+  sub_workflow:
+    max_depth: 5
+    timeout: 180
+    enable_parallel: false
