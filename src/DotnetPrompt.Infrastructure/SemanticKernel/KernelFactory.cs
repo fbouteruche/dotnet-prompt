@@ -55,7 +55,8 @@ public class KernelFactory : IKernelFactory
         var pluginTypes = new[]
         {
             typeof(Plugins.FileSystemPlugin),
-            typeof(Plugins.ProjectAnalysisPlugin)
+            typeof(Plugins.ProjectAnalysisPlugin),
+            typeof(Plugins.SubWorkflowPlugin)
         };
 
         return await CreateKernelWithPluginsAsync(pluginTypes, providerName, configuration);
