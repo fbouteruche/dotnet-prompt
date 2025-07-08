@@ -28,33 +28,59 @@ public class FileSystemPlugin
     [Description("Read file content with security validation and encoding support")]
     [return: Description("File content as string")]
     public async Task<string> ReadFileAsync(
-        [Description("Absolute or relative path to the file")] string filePath,
+        [Description("Absolute or relative path to the file")] string file_path,
         [Description("File encoding (default: UTF-8)")] string encoding = "utf-8",
+        [Description("Maximum file size in MB (default: 10)")] int max_size_mb = 10,
+        [Description("Maximum lines to read (0 = all)")] int max_lines = 0,
+        [Description("Lines to skip from beginning")] int skip_lines = 0,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         
         try
         {
-            _logger.LogInformation("Reading file via SK function: {FilePath}", filePath);
+            _logger.LogInformation("Reading file via SK function: {FilePath}", file_path);
             
             // Validate file path with enhanced security
-            var validatedPath = ValidateAndResolvePath(filePath);
+            var validatedPath = ValidateAndResolvePath(file_path);
             
             if (!File.Exists(validatedPath))
             {
                 throw new FileNotFoundException($"File not found: {validatedPath}");
             }
 
-            // Check file size against options
+            // Check file size against max_size_mb parameter (convert to bytes)
+            var maxSizeBytes = max_size_mb * 1024 * 1024;
             var fileInfo = new FileInfo(validatedPath);
-            if (fileInfo.Length > _options.MaxFileSizeBytes)
+            if (fileInfo.Length > maxSizeBytes)
             {
-                throw new InvalidOperationException($"File too large: {fileInfo.Length} bytes. Maximum allowed: {_options.MaxFileSizeBytes} bytes");
+                throw new InvalidOperationException($"File too large: {fileInfo.Length} bytes. Maximum allowed: {maxSizeBytes} bytes ({max_size_mb} MB)");
             }
 
-            // Read file content
-            var content = await File.ReadAllTextAsync(validatedPath, cancellationToken);
+            // Read file content with line control
+            string content;
+            if (max_lines > 0 || skip_lines > 0)
+            {
+                var lines = await File.ReadAllLinesAsync(validatedPath, cancellationToken);
+                
+                // Skip lines if requested
+                if (skip_lines > 0)
+                {
+                    lines = lines.Skip(skip_lines).ToArray();
+                }
+                
+                // Take only max_lines if specified
+                if (max_lines > 0)
+                {
+                    lines = lines.Take(max_lines).ToArray();
+                }
+                
+                content = string.Join(Environment.NewLine, lines);
+            }
+            else
+            {
+                content = await File.ReadAllTextAsync(validatedPath, cancellationToken);
+            }
             
             _logger.LogInformation("Successfully read file {FilePath} ({Size} bytes) in {Duration}ms", 
                 validatedPath, content.Length, stopwatch.ElapsedMilliseconds);
@@ -63,7 +89,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error reading file {FilePath} via SK function", filePath);
+            _logger.LogError(ex, "Error reading file {FilePath} via SK function", file_path);
             throw new KernelException($"File read failed: {ex.Message}", ex);
         }
         finally
@@ -76,10 +102,10 @@ public class FileSystemPlugin
     [Description("Write content to file with automatic directory creation")]
     [return: Description("Success message with file path and size information")]
     public async Task<string> WriteFileAsync(
-        [Description("Absolute or relative path to the file")] string filePath,
+        [Description("Absolute or relative path to the file")] string file_path,
         [Description("Content to write to the file")] string content,
-        [Description("Create parent directories if they don't exist")] bool createDirectories = true,
         [Description("File encoding (default: UTF-8)")] string encoding = "utf-8",
+        [Description("Create backup before overwrite")] bool create_backup = true,
         [Description("Whether to overwrite existing files (default: true)")] bool overwrite = true,
         CancellationToken cancellationToken = default)
     {
@@ -87,10 +113,19 @@ public class FileSystemPlugin
         
         try
         {
-            _logger.LogInformation("Writing file via SK function: {FilePath}", filePath);
+            _logger.LogInformation("Writing file via SK function: {FilePath}", file_path);
             
             // Validate file path
-            var validatedPath = ValidateAndResolvePath(filePath);
+            var validatedPath = ValidateAndResolvePath(file_path);
+            
+            // Create backup if file exists and create_backup is true
+            string? backupPath = null;
+            if (File.Exists(validatedPath) && create_backup)
+            {
+                backupPath = $"{validatedPath}.backup.{DateTime.UtcNow:yyyyMMdd-HHmmss}";
+                File.Copy(validatedPath, backupPath);
+                _logger.LogDebug("Created backup: {BackupPath}", backupPath);
+            }
             
             // Check if file exists and overwrite flag
             if (File.Exists(validatedPath) && !overwrite)
@@ -98,26 +133,21 @@ public class FileSystemPlugin
                 throw new InvalidOperationException($"File already exists and overwrite is disabled: {validatedPath}");
             }
 
-            // Create directory if it doesn't exist and createDirectories is true
+            // Create directory if it doesn't exist (always create parent directories for write operations)
             var directory = Path.GetDirectoryName(validatedPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                if (createDirectories)
-                {
-                    Directory.CreateDirectory(directory);
-                    _logger.LogDebug("Created directory: {Directory}", directory);
-                }
-                else
-                {
-                    throw new DirectoryNotFoundException($"Directory does not exist and createDirectories is false: {directory}");
-                }
+                Directory.CreateDirectory(directory);
+                _logger.LogDebug("Created directory: {Directory}", directory);
             }
 
             // Write file content
             await File.WriteAllTextAsync(validatedPath, content, cancellationToken);
             
             var fileInfo = new FileInfo(validatedPath);
-            var result = $"Successfully wrote {content.Length} characters to {validatedPath} ({fileInfo.Length} bytes) in {stopwatch.ElapsedMilliseconds}ms";
+            var result = backupPath != null 
+                ? $"Successfully wrote {content.Length} characters to {validatedPath} ({fileInfo.Length} bytes) with backup at {backupPath} in {stopwatch.ElapsedMilliseconds}ms"
+                : $"Successfully wrote {content.Length} characters to {validatedPath} ({fileInfo.Length} bytes) in {stopwatch.ElapsedMilliseconds}ms";
             
             _logger.LogInformation("Successfully wrote file {FilePath} ({Size} bytes) in {Duration}ms", 
                 validatedPath, fileInfo.Length, stopwatch.ElapsedMilliseconds);
@@ -126,7 +156,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error writing file {FilePath} via SK function", filePath);
+            _logger.LogError(ex, "Error writing file {FilePath} via SK function", file_path);
             throw new KernelException($"File write failed: {ex.Message}", ex);
         }
         finally
@@ -139,15 +169,15 @@ public class FileSystemPlugin
     [Description("Check if a file exists at the specified path")]
     [return: Description("True if the file exists, false otherwise")]
     public async Task<bool> FileExistsAsync(
-        [Description("Absolute or relative path to check")] string filePath,
+        [Description("Absolute or relative path to check")] string file_path,
         CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask; // Async compliance for SK function
         try
         {
-            _logger.LogDebug("Checking file existence via SK function: {FilePath}", filePath);
+            _logger.LogDebug("Checking file existence via SK function: {FilePath}", file_path);
             
-            var validatedPath = ValidateAndResolvePath(filePath);
+            var validatedPath = ValidateAndResolvePath(file_path);
             var exists = File.Exists(validatedPath);
             
             _logger.LogDebug("File {FilePath} exists: {Exists}", validatedPath, exists);
@@ -156,7 +186,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking file existence {FilePath} via SK function", filePath);
+            _logger.LogError(ex, "Error checking file existence {FilePath} via SK function", file_path);
             return false;
         }
     }
@@ -165,15 +195,15 @@ public class FileSystemPlugin
     [Description("Gets information about a file including size, creation time, and modification time")]
     [return: Description("JSON object containing file information")]
     public async Task<string> GetFileInfoAsync(
-        [Description("The absolute or relative path to the file")] string filePath,
+        [Description("The absolute or relative path to the file")] string file_path,
         CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask; // Async compliance for SK function
         try
         {
-            _logger.LogDebug("Getting file info via SK function: {FilePath}", filePath);
+            _logger.LogDebug("Getting file info via SK function: {FilePath}", file_path);
             
-            var validatedPath = ValidateAndResolvePath(filePath);
+            var validatedPath = ValidateAndResolvePath(file_path);
             
             if (!File.Exists(validatedPath))
             {
@@ -201,7 +231,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting file info {FilePath} via SK function", filePath);
+            _logger.LogError(ex, "Error getting file info {FilePath} via SK function", file_path);
             throw new KernelException($"Get file info failed: {ex.Message}", ex);
         }
     }
@@ -210,20 +240,20 @@ public class FileSystemPlugin
     [Description("List directory contents with pattern filtering and recursion")]
     [return: Description("JSON object containing directory listing with file metadata")]
     public async Task<string> ListDirectoryAsync(
-        [Description("Directory path to list")] string directoryPath,
+        [Description("Directory path to list")] string directory_path,
         [Description("File pattern filter (e.g., *.cs, *.json)")] string pattern = "*",
         [Description("Include subdirectories")] bool recursive = false,
-        [Description("Include hidden files")] bool includeHidden = false,
-        [Description("Maximum recursion depth (0 = unlimited)")] int maxDepth = 0,
+        [Description("Include hidden files")] bool include_hidden = false,
+        [Description("Maximum recursion depth (0 = unlimited)")] int max_depth = 0,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         
         try
         {
-            _logger.LogInformation("Listing directory via SK function: {DirectoryPath}", directoryPath);
+            _logger.LogInformation("Listing directory via SK function: {DirectoryPath}", directory_path);
             
-            var validatedPath = ValidateAndResolvePath(directoryPath);
+            var validatedPath = ValidateAndResolvePath(directory_path);
             
             if (!Directory.Exists(validatedPath))
             {
@@ -240,7 +270,7 @@ public class FileSystemPlugin
                 foreach (var dir in directories.Take(_options.MaxFilesPerOperation))
                 {
                     var dirInfo = new DirectoryInfo(dir);
-                    if (!includeHidden && dirInfo.Attributes.HasFlag(FileAttributes.Hidden))
+                    if (!include_hidden && dirInfo.Attributes.HasFlag(FileAttributes.Hidden))
                         continue;
                         
                     items.Add(new FileSystemItem(
@@ -260,7 +290,7 @@ public class FileSystemPlugin
                 foreach (var file in files.Take(_options.MaxFilesPerOperation - items.Count))
                 {
                     var fileInfo = new FileInfo(file);
-                    if (!includeHidden && fileInfo.Attributes.HasFlag(FileAttributes.Hidden))
+                    if (!include_hidden && fileInfo.Attributes.HasFlag(FileAttributes.Hidden))
                         continue;
                         
                     items.Add(new FileSystemItem(
@@ -304,7 +334,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error listing directory {DirectoryPath} via SK function", directoryPath);
+            _logger.LogError(ex, "Error listing directory {DirectoryPath} via SK function", directory_path);
             throw new KernelException($"Directory listing failed: {ex.Message}", ex);
         }
         finally
@@ -317,8 +347,8 @@ public class FileSystemPlugin
     [Description("Copy file to destination with safety controls")]
     [return: Description("Success message with operation details")]
     public async Task<string> CopyFileAsync(
-        [Description("Source file path")] string sourcePath,
-        [Description("Destination file path")] string destinationPath,
+        [Description("Source file path")] string source_path,
+        [Description("Destination file path")] string destination_path,
         [Description("Allow overwriting destination")] bool overwrite = false,
         CancellationToken cancellationToken = default)
     {
@@ -326,10 +356,10 @@ public class FileSystemPlugin
         
         try
         {
-            _logger.LogInformation("Copying file via SK function: {SourcePath} to {DestinationPath}", sourcePath, destinationPath);
+            _logger.LogInformation("Copying file via SK function: {SourcePath} to {DestinationPath}", source_path, destination_path);
             
-            var validatedSourcePath = ValidateAndResolvePath(sourcePath);
-            var validatedDestinationPath = ValidateAndResolvePath(destinationPath);
+            var validatedSourcePath = ValidateAndResolvePath(source_path);
+            var validatedDestinationPath = ValidateAndResolvePath(destination_path);
             
             if (!File.Exists(validatedSourcePath))
             {
@@ -368,7 +398,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error copying file from {SourcePath} to {DestinationPath} via SK function", sourcePath, destinationPath);
+            _logger.LogError(ex, "Error copying file from {SourcePath} to {DestinationPath} via SK function", source_path, destination_path);
             throw new KernelException($"File copy failed: {ex.Message}", ex);
         }
         finally
@@ -381,23 +411,37 @@ public class FileSystemPlugin
     [Description("Create directory structure")]
     [return: Description("Success message with directory path")]
     public async Task<string> CreateDirectoryAsync(
-        [Description("Directory path to create")] string directoryPath,
+        [Description("Directory path to create")] string directory_path,
+        [Description("Create parent directories")] bool recursive = true,
         CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask; // Async compliance for SK function
         
         try
         {
-            _logger.LogInformation("Creating directory via SK function: {DirectoryPath}", directoryPath);
+            _logger.LogInformation("Creating directory via SK function: {DirectoryPath}", directory_path);
             
-            var validatedPath = ValidateAndResolvePath(directoryPath);
+            var validatedPath = ValidateAndResolvePath(directory_path);
             
             if (Directory.Exists(validatedPath))
             {
                 return $"Directory already exists: {validatedPath}";
             }
 
-            Directory.CreateDirectory(validatedPath);
+            if (recursive)
+            {
+                Directory.CreateDirectory(validatedPath);
+            }
+            else
+            {
+                // Check if parent directory exists
+                var parentDirectory = Path.GetDirectoryName(validatedPath);
+                if (!string.IsNullOrEmpty(parentDirectory) && !Directory.Exists(parentDirectory))
+                {
+                    throw new DirectoryNotFoundException($"Parent directory does not exist and recursive is false: {parentDirectory}");
+                }
+                Directory.CreateDirectory(validatedPath);
+            }
             
             var result = $"Successfully created directory: {validatedPath}";
             
@@ -407,7 +451,7 @@ public class FileSystemPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating directory {DirectoryPath} via SK function", directoryPath);
+            _logger.LogError(ex, "Error creating directory {DirectoryPath} via SK function", directory_path);
             throw new KernelException($"Directory creation failed: {ex.Message}", ex);
         }
     }
