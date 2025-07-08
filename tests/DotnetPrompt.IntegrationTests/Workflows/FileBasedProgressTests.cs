@@ -44,8 +44,8 @@ public class FileBasedProgressTests : IDisposable
             },
             ExecutionHistory = new List<StepExecutionHistory>
             {
-                new() { StepName = "Initialize", Timestamp = DateTime.UtcNow.AddMinutes(-2), Success = true },
-                new() { StepName = "Analyze", Timestamp = DateTime.UtcNow.AddMinutes(-1), Success = true }
+                new() { StepName = "Initialize", StartTime = DateTime.UtcNow.AddMinutes(-2), EndTime = DateTime.UtcNow.AddMinutes(-1), Success = true },
+                new() { StepName = "Analyze", StartTime = DateTime.UtcNow.AddMinutes(-1), EndTime = DateTime.UtcNow, Success = true }
             },
             StartTime = DateTime.UtcNow.AddMinutes(-5)
         };
@@ -91,7 +91,7 @@ public class FileBasedProgressTests : IDisposable
             Variables = new Dictionary<string, object> { ["test"] = "value" },
             ExecutionHistory = new List<StepExecutionHistory>
             {
-                new() { StepName = "Started", Timestamp = DateTime.UtcNow, Success = true }
+                new() { StepName = "Started", StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow, Success = true }
             }
         };
 
@@ -148,9 +148,9 @@ public class FileBasedProgressTests : IDisposable
             },
             ExecutionHistory = new List<StepExecutionHistory> 
             { 
-                new() { StepName = "Project discovery", Timestamp = DateTime.UtcNow.AddMinutes(-3), Success = true },
-                new() { StepName = "Dependency analysis", Timestamp = DateTime.UtcNow.AddMinutes(-2), Success = true },
-                new() { StepName = "File analysis - IN PROGRESS", Timestamp = DateTime.UtcNow.AddMinutes(-1), Success = false }
+                new() { StepName = "Project discovery", StartTime = DateTime.UtcNow.AddMinutes(-3), EndTime = DateTime.UtcNow.AddMinutes(-2), Success = true },
+                new() { StepName = "Dependency analysis", StartTime = DateTime.UtcNow.AddMinutes(-2), EndTime = DateTime.UtcNow.AddMinutes(-1), Success = true },
+                new() { StepName = "File analysis - IN PROGRESS", StartTime = DateTime.UtcNow.AddMinutes(-1), EndTime = DateTime.UtcNow, Success = false }
             },
             StartTime = DateTime.UtcNow.AddMinutes(-10)
         };
@@ -177,7 +177,8 @@ public class FileBasedProgressTests : IDisposable
         resumedContext.ExecutionHistory.Add(new StepExecutionHistory 
         { 
             StepName = "Code quality analysis - COMPLETED", 
-            Timestamp = DateTime.UtcNow, 
+            StartTime = DateTime.UtcNow, 
+            EndTime = DateTime.UtcNow.AddMinutes(1),
             Success = true 
         });
 
@@ -221,7 +222,7 @@ public class FileBasedProgressTests : IDisposable
             Variables = new Dictionary<string, object> { ["test"] = "cleanup" },
             ExecutionHistory = new List<StepExecutionHistory>
             {
-                new() { StepName = "Test step", Timestamp = DateTime.UtcNow, Success = true }
+                new() { StepName = "Test step", StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow, Success = true }
             }
         };
 
@@ -275,8 +276,8 @@ public class FileBasedProgressTests : IDisposable
             },
             ExecutionHistory = new List<StepExecutionHistory>
             { 
-                new() { StepName = "Cross-platform path test", Timestamp = DateTime.UtcNow.AddMinutes(-1), Success = true },
-                new() { StepName = "Unicode content handling", Timestamp = DateTime.UtcNow, Success = true }
+                new() { StepName = "Cross-platform path test", StartTime = DateTime.UtcNow.AddMinutes(-1), EndTime = DateTime.UtcNow, Success = true },
+                new() { StepName = "Unicode content handling", StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow, Success = true }
             }
         };
 
