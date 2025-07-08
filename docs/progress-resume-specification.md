@@ -1,166 +1,246 @@
-# Progress and Resume System Specification (SK-Powered)
+# Progress and Resume System Specification (File-Based)
 
 ## Overview
 
-This document defines the progress tracking and resume functionality leveraging Semantic Kernel's ChatHistory, conversation state management, and Vector Store persistence capabilities.
+This document defines the progress tracking and resume functionality using simple file-based storage with Semantic Kernel's ChatHistory for conversation state management.
 
 ## Status
-✅ **COMPLETE** - SK-based progress tracking and resume patterns defined
+✅ **COMPLETE** - File-based progress tracking and resume patterns defined
 
-## SK-Based Progress Management
+## File-Based Progress Management
 
 ### Core Components
 - **SK ChatHistory**: Native conversation state management with automatic serialization
-- **SK Vector Store**: Persistent storage for conversation state and workflow metadata
-- **SK Conversation State**: Built-in checkpoint and resume capabilities
+- **File System Storage**: Simple JSON files for persistent progress storage
+- **Directory Organization**: Structured progress file organization in `.dotnet-prompt/progress/`
 - **SK Function Context**: Automatic parameter and execution state tracking
 
 ### Progress Storage Architecture
 
-#### SK ChatHistory Persistence
+#### File-Based Progress Persistence
 ```csharp
-public class SkProgressManager : IProgressManager
+public class FileProgressManager : IProgressManager
 {
-    private readonly IVectorStore _vectorStore;
-    private readonly IChatHistory _chatHistory;
-    private readonly ILogger<SkProgressManager> _logger;
+    private readonly ILogger<FileProgressManager> _logger;
+    private readonly ProgressConfig _config;
+    private readonly JsonSerializerOptions _jsonOptions;
     
-    public async Task SaveProgressAsync(string workflowId, WorkflowExecutionContext context)
+    public async Task SaveProgressAsync(string workflowId, WorkflowExecutionContext context, ChatHistory chatHistory)
     {
-        // Use SK Vector Store for conversation persistence
-        var collection = _vectorStore.GetCollection<string, WorkflowProgress>("workflow_progress");
+        // Create progress directory if it doesn't exist
+        var progressDir = GetProgressDirectory();
+        Directory.CreateDirectory(progressDir);
         
-        var progressRecord = new WorkflowProgress
+        // Create progress file path
+        var progressFile = Path.Combine(progressDir, $"{workflowId}.json");
+        
+        var progressData = new WorkflowProgressFile
         {
-            Id = workflowId,
-            ChatHistoryJson = JsonSerializer.Serialize(_chatHistory),
-            ExecutionContext = context,
-            LastCheckpoint = DateTimeOffset.UtcNow,
-            Status = WorkflowStatus.InProgress
+            WorkflowMetadata = new WorkflowMetadata
+            {
+                Id = workflowId,
+                FilePath = context.GetVariable<string>("workflow_file") ?? string.Empty,
+                WorkflowHash = context.GetVariable<string>("workflow_hash") ?? string.Empty,
+                StartedAt = context.StartTime,
+                LastCheckpoint = DateTimeOffset.UtcNow,
+                Status = "in_progress"
+            },
+            ChatHistory = chatHistory.Select(msg => new ChatMessage
+            {
+                Role = msg.Role.ToString(),
+                Content = msg.Content,
+                Timestamp = DateTimeOffset.UtcNow
+            }).ToArray(),
+            ExecutionContext = new ExecutionContextData
+            {
+                CurrentStep = context.CurrentStep,
+                Variables = context.Variables,
+                ExecutionHistory = context.ExecutionHistory
+            }
         };
         
-        await collection.UpsertAsync(progressRecord);
-        _logger.LogInformation("Progress saved for workflow {WorkflowId} at checkpoint {Timestamp}", 
-            workflowId, progressRecord.LastCheckpoint);
+        var json = JsonSerializer.Serialize(progressData, _jsonOptions);
+        await File.WriteAllTextAsync(progressFile, json);
+        
+        _logger.LogInformation("Progress saved to {ProgressFile} for workflow {WorkflowId}", 
+            progressFile, workflowId);
     }
     
-    public async Task<WorkflowExecutionContext?> LoadProgressAsync(string workflowId)
+    public async Task<(WorkflowExecutionContext? Context, ChatHistory? ChatHistory)?> LoadProgressAsync(string workflowId)
     {
-        var collection = _vectorStore.GetCollection<string, WorkflowProgress>("workflow_progress");
-        var progressRecord = await collection.GetAsync(workflowId);
+        var progressFile = Path.Combine(GetProgressDirectory(), $"{workflowId}.json");
         
-        if (progressRecord == null) return null;
+        if (!File.Exists(progressFile))
+        {
+            _logger.LogDebug("No progress file found for workflow {WorkflowId}", workflowId);
+            return null;
+        }
         
-        // Restore SK ChatHistory from persisted state
-        var chatHistory = JsonSerializer.Deserialize<ChatHistory>(progressRecord.ChatHistoryJson);
-        await RestoreChatHistoryAsync(chatHistory);
+        var json = await File.ReadAllTextAsync(progressFile);
+        var progressData = JsonSerializer.Deserialize<WorkflowProgressFile>(json, _jsonOptions);
         
-        return progressRecord.ExecutionContext;
+        if (progressData == null)
+        {
+            _logger.LogWarning("Failed to deserialize progress file for workflow {WorkflowId}", workflowId);
+            return null;
+        }
+        
+        // Restore ChatHistory
+        var chatHistory = new ChatHistory();
+        foreach (var msg in progressData.ChatHistory)
+        {
+            chatHistory.Add(new ChatMessageContent(
+                AuthorRole.Parse(msg.Role), 
+                msg.Content));
+        }
+        
+        // Restore ExecutionContext
+        var context = new WorkflowExecutionContext
+        {
+            CurrentStep = progressData.ExecutionContext.CurrentStep,
+            Variables = progressData.ExecutionContext.Variables,
+            ExecutionHistory = progressData.ExecutionContext.ExecutionHistory,
+            StartTime = progressData.WorkflowMetadata.StartedAt
+        };
+        
+        return (context, chatHistory);
+    }
+    
+    private string GetProgressDirectory()
+    {
+        return _config.StorageLocation ?? "./.dotnet-prompt/progress";
     }
 }
 ```
 
-## Progress File Format (SK-Enhanced)
+## Progress File Format (File-Based)
 
-### Enhanced Progress Structure (`sk-progress.json`)
+### Progress File Structure (`{workflow-id}.json`)
 ```json
 {
   "workflow_metadata": {
-    "id": "workflow-abc123",
-    "file_path": "./workflow.prompt.md",
-    "started_at": "2025-06-30T14:30:00Z",
-    "last_checkpoint": "2025-06-30T14:35:22Z",
-    "status": "in_progress",
-    "sk_kernel_version": "1.0.0"
+    "id": "workflow_project-analysis_20250708_143022_1234",
+    "file_path": "./project-analysis.prompt.md",
+    "workflow_hash": "abc123def456...",
+    "started_at": "2025-07-08T14:30:22Z",
+    "last_checkpoint": "2025-07-08T14:35:45Z",
+    "status": "in_progress"
   },
-  "sk_chat_history": {
-    "messages": [
+  "chat_history": [
+    {
+      "role": "user",
+      "content": "Analyze the project structure and dependencies for ./MyApp.csproj",
+      "timestamp": "2025-07-08T14:30:25Z"
+    },
+    {
+      "role": "assistant", 
+      "content": "I'll analyze your project structure and dependencies. Let me start by examining the project file.",
+      "timestamp": "2025-07-08T14:30:30Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "function_calls": [
+        {
+          "function_name": "ProjectAnalysis.analyze_project",
+          "parameters": {
+            "project_path": "./MyApp.csproj",
+            "include_dependencies": true
+          },
+          "call_id": "call_abc123"
+        }
+      ],
+      "timestamp": "2025-07-08T14:30:32Z"
+    },
+    {
+      "role": "tool",
+      "content": "{\"project_type\": \"console\", \"target_framework\": \"net8.0\", \"dependencies\": [...]}",
+      "tool_call_id": "call_abc123",
+      "timestamp": "2025-07-08T14:32:15Z"
+    }
+  ],
+  "execution_context": {
+    "current_step": 2,
+    "variables": {
+      "project_path": "./MyApp.csproj",
+      "analysis_results": {
+        "project_type": "console",
+        "target_framework": "net8.0",
+        "dependencies": [...]
+      }
+    },
+    "execution_history": [
       {
-        "role": "user",
-        "content": "[Original workflow content]",
-        "timestamp": "2025-06-30T14:30:05Z"
-      },
-      {
-        "role": "assistant", 
-        "content": "I'll help you with that project analysis.",
-        "function_calls": [
-          {
-            "function_name": "ProjectAnalysis.analyze_project",
-            "parameters": {
-              "project_path": "./MyApp.csproj",
-              "include_dependencies": true
-            },
-            "call_id": "call_abc123"
-          }
-        ],
-        "timestamp": "2025-06-30T14:30:10Z"
-      },
-      {
-        "role": "tool",
-        "content": "{\"project_type\": \"console\", \"target_framework\": \"net8.0\"}",
-        "tool_call_id": "call_abc123",
-        "timestamp": "2025-06-30T14:32:15Z"
+        "step_name": "ProjectAnalysis.analyze_project",
+        "step_type": "function",
+        "start_time": "2025-07-08T14:30:32Z",
+        "end_time": "2025-07-08T14:32:15Z",
+        "success": true,
+        "error_message": null
       }
     ]
-  },
-  "sk_execution_state": {
-    "current_function_step": 2,
-    "completed_functions": ["ProjectAnalysis.analyze_project"],
-    "pending_functions": ["BuildTest.run_tests", "FileSystem.create_files"],
-    "function_results": {
-      "call_abc123": {
-        "function": "ProjectAnalysis.analyze_project",
-        "result": { "project_type": "console", "target_framework": "net8.0" },
-        "execution_time_ms": 2150,
-        "success": true
-      }
-    },
-    "conversation_variables": {
-      "project_path": "./MyApp.csproj",
-      "analysis_result": { "project_type": "console" }
-    }
-  },
-  "sk_configuration": {
-    "kernel_settings": {
-      "execution_settings": {
-        "function_choice_behavior": "auto",
-        "temperature": 0.7,
-        "max_tokens": 4000
-      }
-    },
-    "active_plugins": ["ProjectAnalysis", "BuildTest", "FileSystem"],
-    "ai_service": {
-      "provider": "github", 
-      "model": "gpt-4o"
-    }
   }
 }
+```
+
+### Directory Structure
+```
+.dotnet-prompt/
+├── progress/
+│   ├── workflow_project-analysis_20250708_143022_1234.json
+│   ├── workflow_documentation_20250708_150000_5678.json
+│   └── cleanup_metadata.json
+├── cache/
+│   └── [tool result caching - separate from progress]
+└── config.yaml
+```
+
+### File Naming Convention
+- **Pattern**: `{workflow-id}.json`
+- **Workflow ID**: `workflow_{workflow-name}_{timestamp}_{context-hash}`
+- **Examples**:
+  - `workflow_project-analysis_20250708_143022_1234.json`
+  - `workflow_complex-build_20250708_160000_abcd.json`
 ```
 
 ## State Serialization
 
 ### What Gets Saved
-- Complete conversation history
-- Tool execution results
-- Workflow configuration and parameters
-- Execution context and variables
-- Error states and retry attempts
+- **Complete conversation history**: All user, assistant, and tool messages
+- **Tool execution results**: Function call results and intermediate outputs
+- **Workflow configuration**: Model settings, provider, and execution parameters
+- **Execution context**: Current step, variables, and execution history
+- **Workflow metadata**: File path, hash, timestamps, and status
 
 ### Checkpoint Strategy
-- When checkpoints are created
-- How often state is persisted
-- Storage location and naming
+- **Automatic checkpoints**: Created after each successful tool execution
+- **Manual checkpoints**: Can be triggered via CLI commands
+- **Progress frequency**: Configurable via `checkpoint_frequency` setting
+- **Storage location**: Configurable via `storage_location` setting (default: `./.dotnet-prompt/progress/`)
+- **File management**: Automatic cleanup of old progress files based on retention policy
+
+### File Management
+- **Atomic writes**: Progress files written atomically to prevent corruption
+- **Backup creation**: Previous progress file backed up before updates
+- **Cleanup policies**: Configurable retention (default: 7 days for completed workflows)
+- **Compression**: Optional gzip compression for large progress files
+- **Validation**: JSON schema validation on load to detect corruption
 
 ## Resume Logic
 
 ### Resume Process
-1. Load progress file
-2. Validate workflow compatibility
-3. Restore conversation state
-4. Continue from last checkpoint
+1. **Load progress file**: Read and validate the JSON progress file
+2. **Validate workflow compatibility**: Compare workflow hash for significant changes
+3. **Restore conversation state**: Reconstruct SK ChatHistory from saved messages
+4. **Restore execution context**: Rebuild variables, step counter, and execution history
+5. **Continue from last checkpoint**: Resume workflow execution from the last successful step
 
 ### State Restoration
-How the execution context is restored and continued.
+- **ChatHistory reconstruction**: Convert saved messages back to SK ChatHistory format
+- **Variable restoration**: Restore all workflow variables and intermediate results
+- **Context validation**: Ensure restored context is consistent and complete
+- **Error recovery**: Handle cases where restoration fails gracefully
+- **Compatibility checks**: Validate that current workflow version is compatible with saved progress
 
 ## Clarifying Questions
 
@@ -214,11 +294,13 @@ How the execution context is restored and continued.
 - Should there be batch resume capabilities?
 
 ### 8. Progress File Management
-- Where should progress files be stored?
-- How should progress file naming work?
-- Should there be automatic cleanup of old progress files?
-- How should progress files be backed up or versioned?
-- Should there be progress file compression?
+- **Storage location**: Default `.dotnet-prompt/progress/`, configurable via `storage_location`
+- **File naming**: `{workflow-id}.json` pattern with unique workflow identifiers
+- **Automatic cleanup**: Configurable retention policies for old progress files
+- **File organization**: Structured directory layout for easy management
+- **Backup and recovery**: Progress file backup strategies and corruption recovery
+- **Compression**: Optional compression for large progress files
+- **Permissions**: File system permissions and access control
 
 ### 9. User Experience
 - How should users be informed about available resume options?
@@ -235,17 +317,21 @@ How the execution context is restored and continued.
 - What audit logging is needed for resume operations?
 
 ### 11. Performance Considerations
-- How should large progress files be handled efficiently?
-- What is the strategy for progress file compression?
-- How should memory usage be managed during state restoration?
-- Should there be lazy loading of progress state?
-- How should progress file corruption be detected and handled?
+- **File I/O optimization**: Efficient reading/writing of progress files
+- **JSON serialization**: Optimized serialization for large conversation histories
+- **Memory management**: Efficient loading and processing of progress data
+- **Lazy loading**: Load progress data on-demand to reduce startup time
+- **Corruption detection**: Fast validation of progress file integrity
+- **Concurrent access**: File locking and concurrent access patterns
+- **Large file handling**: Streaming and chunked processing for large progress files
 
 ## Next Steps
 
-1. Define the exact progress file format and schema
-2. Implement state serialization and deserialization
-3. Create checkpoint and resume logic
-4. Design progress file management system
-5. Implement error recovery strategies
-6. Create progress tracking and reporting features
+1. **Implement FileProgressManager**: Create file-based progress manager replacing the current in-memory implementation
+2. **Define progress file schema**: Create JSON schema for progress file validation
+3. **Implement file management**: Create utilities for cleanup, backup, and recovery
+4. **Add resume functionality**: Implement workflow resume from progress files
+5. **Create progress CLI commands**: Add commands for listing, cleaning, and managing progress files
+6. **Add configuration options**: Implement storage location and retention policy configuration
+7. **Implement error recovery**: Handle progress file corruption and incomplete states
+8. **Add progress reporting**: Create utilities for progress visualization and debugging

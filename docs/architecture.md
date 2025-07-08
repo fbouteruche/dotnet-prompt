@@ -91,17 +91,16 @@ Implements use cases leveraging **Semantic Kernel** for AI orchestration and **n
 
 // Services (SK-native implementation)
 - IWorkflowOrchestrator (SemanticKernelOrchestrator with Handlebars templates)
-- IProgressManager (uses SK ChatHistory and conversation state persistence)
+- IProgressManager (FileProgressManager with SK ChatHistory serialization)
 - IConfigurationResolver (uses SK dependency injection patterns)
 - IKernelFactory (configures SK with providers, tools, and Handlebars factory)
-- IConversationStateManager (uses SK ChatHistory and memory persistence)
 ```
 
 **Key Responsibilities:**
 - Workflow execution orchestration via SK Handlebars templates and function calling
 - Variable substitution via SK native Handlebars templating engine
 - Sub-workflow composition via dedicated SubWorkflowPlugin
-- Progress tracking and resume via SK conversation state management
+- Progress tracking and resume via file-based storage with SK ChatHistory serialization
 - Configuration hierarchy via SK dependency injection patterns
 - Error handling and retry via SK filters and middleware
 - Observability and telemetry via SK built-in instrumentation
@@ -146,8 +145,7 @@ External integrations and persistence, fully leveraging SK capabilities:
 - HandlebarsPromptTemplateFactory for dotprompt-compatible templating
 - Built-in tool plugins with SK function annotations (no WorkflowExecutorPlugin)
 - SubWorkflowPlugin for sub-workflow composition and orchestration
-- SK ChatHistory persistence for conversation state
-- SK vector store connectors for memory and caching
+- SK ChatHistory serialization for progress files
 - SK filters for function calling, prompt execution, and chat completion
 - SK middleware for observability, security, and performance monitoring
 
@@ -157,11 +155,11 @@ External integrations and persistence, fully leveraging SK capabilities:
 - FileSystemPlugin (SK function with security filters)
 - SubWorkflowPlugin (SK function for workflow composition)
 
-// Memory & Caching (SK Vector Store Connectors)
-- IVectorStore for workflow and conversation caching
-- Vector search for intelligent workflow discovery
-- Embedding generation for semantic search capabilities
-- Memory persistence for long-running workflow state
+// Progress & State Management (File-Based)
+- FileProgressManager for JSON progress file persistence
+- Progress file management utilities (cleanup, backup, validation)
+- Atomic file operations for progress checkpoint safety
+- Configurable retention policies for progress file cleanup
 
 // MCP Integration (via SK Plugin Architecture)
 - McpServerPlugin (SK plugin wrapper for MCP servers)
@@ -291,23 +289,29 @@ public class SubWorkflowPlugin
 }
 ```
 
-### 5.4 SK ChatHistory for State Management
+### 5.4 File-Based Progress Management with SK ChatHistory
 
 ```csharp
-// SK conversation state management with persistence
-public class SkConversationStateManager : IConversationStateManager
+// File-based progress management with SK ChatHistory integration
+public class FileProgressManager : IProgressManager
 {
-    private readonly IVectorStore _vectorStore;
+    private readonly ILogger<FileProgressManager> _logger;
+    private readonly ProgressConfig _config;
     
     public async Task<ChatHistory> LoadConversationStateAsync(string workflowId)
     {
-        // Use SK Vector Store for conversation persistence
-        var collection = _vectorStore.GetCollection<string, ConversationRecord>("conversations");
-        var conversation = await collection.GetAsync(workflowId);
-        
-        if (conversation?.ChatHistoryJson != null)
+        var progressData = await LoadProgressAsync(workflowId);
+        if (progressData?.ChatHistory != null)
         {
-            return JsonSerializer.Deserialize<ChatHistory>(conversation.ChatHistoryJson);
+            // Reconstruct SK ChatHistory from saved progress file
+            var chatHistory = new ChatHistory();
+            foreach (var message in progressData.Value.ChatHistory)
+            {
+                chatHistory.Add(new ChatMessageContent(
+                    AuthorRole.Parse(message.Role),
+                    message.Content));
+            }
+            return chatHistory;
         }
         
         return new ChatHistory();
@@ -315,13 +319,14 @@ public class SkConversationStateManager : IConversationStateManager
     
     public async Task SaveConversationStateAsync(string workflowId, ChatHistory chatHistory)
     {
-        // Persist using SK Vector Store with automatic embedding generation
-        var collection = _vectorStore.GetCollection<string, ConversationRecord>("conversations");
-        await collection.UpsertAsync(new ConversationRecord
+        // Save as part of the progress file - no separate conversation persistence needed
+        var existingProgress = await LoadProgressAsync(workflowId);
+        if (existingProgress != null)
         {
-            Id = workflowId,
-            ChatHistoryJson = JsonSerializer.Serialize(chatHistory),
-            LastModified = DateTimeOffset.UtcNow
+            await SaveProgressAsync(workflowId, existingProgress.Value.Context!, chatHistory);
+        }
+    }
+}
         });
     }
 }
@@ -375,49 +380,56 @@ builder.Services.AddSingleton<IPromptRenderFilter, WorkflowExecutionFilter>();
 builder.Services.AddSingleton<IFunctionInvocationFilter, WorkflowExecutionFilter>();
 ```
 
-### 5.6 SK Vector Store for Intelligent Caching
+### 5.6 File-Based Progress Management
 
 ```csharp
-// Intelligent workflow caching using SK Vector Store
-public class SkWorkflowCacheManager
+// File-based progress management with SK ChatHistory serialization
+public class FileProgressManager : IProgressManager
 {
-    private readonly IVectorStore _vectorStore;
-    private readonly ITextEmbeddingGenerationService _embeddingService;
+    private readonly ILogger<FileProgressManager> _logger;
+    private readonly ProgressConfig _config;
+    private readonly JsonSerializerOptions _jsonOptions;
     
-    public async Task<WorkflowResult?> GetCachedResultAsync(string workflowContent, WorkflowContext context)
+    public async Task SaveProgressAsync(string workflowId, WorkflowExecutionContext context, ChatHistory chatHistory)
     {
-        // Generate embedding for semantic similarity search
-        var contentEmbedding = await _embeddingService.GenerateEmbeddingAsync(workflowContent);
+        var progressDir = GetProgressDirectory();
+        Directory.CreateDirectory(progressDir);
         
-        // Use SK vector search for intelligent cache lookup
-        var collection = _vectorStore.GetCollection<string, CachedWorkflowResult>("workflow_cache");
-        var searchResults = await collection.SearchAsync(contentEmbedding, new VectorSearchOptions { Top = 1, MinScore = 0.95 });
-        
-        var cachedResult = searchResults.FirstOrDefault();
-        if (cachedResult != null && IsContextCompatible(cachedResult.Record.Context, context))
+        var progressFile = Path.Combine(progressDir, $"{workflowId}.json");
+        var progressData = new WorkflowProgressFile
         {
-            return cachedResult.Record.Result;
-        }
+            WorkflowMetadata = CreateMetadata(workflowId, context),
+            ChatHistory = SerializeChatHistory(chatHistory),
+            ExecutionContext = context
+        };
         
-        return null;
+        // Atomic write to prevent corruption
+        var tempFile = $"{progressFile}.tmp";
+        var json = JsonSerializer.Serialize(progressData, _jsonOptions);
+        await File.WriteAllTextAsync(tempFile, json);
+        File.Move(tempFile, progressFile);
+        
+        _logger.LogInformation("Progress saved to {ProgressFile}", progressFile);
     }
     
-    public async Task CacheWorkflowResultAsync(string workflowContent, WorkflowContext context, WorkflowResult result)
+    public async Task<(WorkflowExecutionContext?, ChatHistory?)?> LoadProgressAsync(string workflowId)
     {
-        // Cache with semantic embedding for intelligent retrieval
-        var contentEmbedding = await _embeddingService.GenerateEmbeddingAsync(workflowContent);
+        var progressFile = Path.Combine(GetProgressDirectory(), $"{workflowId}.json");
         
-        var collection = _vectorStore.GetCollection<string, CachedWorkflowResult>("workflow_cache");
-        await collection.UpsertAsync(new CachedWorkflowResult
-        {
-            Id = GenerateCacheKey(workflowContent, context),
-            WorkflowContent = workflowContent,
-            ContentEmbedding = contentEmbedding,
-            Context = context,
-            Result = result,
-            CachedAt = DateTimeOffset.UtcNow
-        });
+        if (!File.Exists(progressFile))
+            return null;
+            
+        var json = await File.ReadAllTextAsync(progressFile);
+        var progressData = JsonSerializer.Deserialize<WorkflowProgressFile>(json, _jsonOptions);
+        
+        if (progressData == null)
+            return null;
+            
+        var chatHistory = DeserializeChatHistory(progressData.ChatHistory);
+        return (progressData.ExecutionContext, chatHistory);
     }
+    
+    private string GetProgressDirectory() => _config.StorageLocation ?? "./.dotnet-prompt/progress";
 }
 ```
 
@@ -436,8 +448,6 @@ public class SkWorkflowCacheManager
 - **Microsoft.SemanticKernel** - Complete AI orchestration framework with function calling and state management
 - **Microsoft.SemanticKernel.PromptTemplates.Handlebars** - Native Handlebars templating for dotprompt compatibility
 - **Microsoft.SemanticKernel.Plugins.Core** - Built-in SK plugins for core operations
-- **Microsoft.Extensions.VectorData.Abstractions** - SK Vector Store abstractions for memory and caching
-- **Microsoft.SemanticKernel.Connectors.Memory** - SK memory connectors for persistence
 - **Microsoft.Extensions.AI.Abstractions** - Core interfaces for AI services
 - **C# SDK for MCP** - Native Model Context Protocol support integrated via SK plugins
 
@@ -484,13 +494,13 @@ public class SkWorkflowCacheManager
 - **Lazy Kernel Initialization**: Create SK kernels on-demand with cached configurations
 - **Plugin Registration Optimization**: Register only required SK plugins per workflow
 - **Service Provider Caching**: Cache SK service configurations for rapid kernel creation
-- **Vector Store Warm-up**: Pre-load frequently accessed embeddings and conversation state
+- **Progress File Indexing**: Fast scanning of progress directory for available workflows
 - **Function Compilation**: SK function compilation caching for repeated workflow executions
 
 ### 8.2 Runtime Performance (SK Features)
 
 - **SK Function Caching**: Leverage SK's built-in function result caching mechanisms
-- **Vector Store Optimization**: Use SK Vector Store connectors for intelligent caching and retrieval
+- **File-Based Progress**: Efficient JSON serialization and atomic file operations
 - **Conversation State Compression**: Efficient SK ChatHistory serialization and storage
 - **Parallel Function Execution**: SK support for parallel function calling when appropriate
 - **Token Management**: SK automatic token counting and optimization for model interactions
@@ -503,7 +513,7 @@ public class SkWorkflowCacheManager
 - **SK Function Plugins**: Additional built-in tools via SK's native plugin system
 - **SubWorkflowPlugin**: Dedicated plugin for workflow composition and orchestration
 - **Provider Extensions**: Custom AI provider implementations via Microsoft.Extensions.AI
-- **Vector Store Connectors**: Custom memory/caching implementations via SK Vector Store abstractions
+- **Progress Extensions**: Custom progress management implementations via IProgressManager interface
 - **Filter Pipeline**: Custom SK filters for workflow-specific processing and validation
 - **Middleware Extensions**: Custom SK middleware for specialized cross-cutting concerns
 
@@ -513,7 +523,7 @@ public class SkWorkflowCacheManager
 - **SK Function Mapping**: Automatic conversion of MCP tools to SK functions with proper annotations
 - **Version Compatibility**: Graceful MCP version handling via SK function versioning
 - **Tool Isolation**: SK function sandboxing for safe MCP tool execution
-- **State Management**: MCP server state persistence via SK conversation and vector storage
+- **State Management**: MCP server state persistence via progress file integration
 
 ## 10. Deployment and Distribution
 
@@ -661,12 +671,12 @@ public class SkWorkflowCacheManager
 - AI provider configuration via Microsoft.Extensions.AI (~30 lines)
 - Semantic Kernel setup with full feature utilization (~80 lines)
 - MCP integration via SK plugin wrappers (~40 lines)
-- Progress tracking via SK ChatHistory (~20 lines)
+- Progress tracking via file-based storage with SK ChatHistory (~35 lines)
 - Error handling via SK filters and middleware (~60 lines)
-- Caching via SK Vector Store connectors (~35 lines)
+- File-based persistence and management (~25 lines)
 - Observability via SK built-in telemetry (~15 lines)
 - Workflow orchestration via SK function calling (~50 lines)
-- **Total**: ~330 lines of infrastructure code
+- **Total**: ~335 lines of infrastructure code
 
 **Code Reduction**: ~92% reduction in infrastructure code
 **Feature Enhancement**: Significantly more capabilities with less code
@@ -682,20 +692,20 @@ public class SkWorkflowCacheManager
 2. Basic CLI structure with System.CommandLine
 3. Full Semantic Kernel setup with dependency injection, filters, and middleware
 4. Workflow parsing with SK prompt template engine integration
-5. SK Vector Store setup for memory and conversation persistence
+5. File-based progress management setup with JSON serialization
 
 ### Phase 2: Core Functionality - SK-Powered
 1. Built-in tools as comprehensive SK plugins with proper annotations
 2. Workflow execution via SK automatic function calling and planning
-3. Progress tracking and state management via SK ChatHistory and Vector Store
-4. Resume functionality leveraging SK conversation state persistence
+3. Progress tracking and state management via file-based storage with SK ChatHistory serialization
+4. Resume functionality leveraging progress file restoration and SK conversation state
 5. Error handling and retry via SK filters and middleware pipeline
 
 ### Phase 3: Extensibility - SK Plugin Ecosystem
 1. Additional AI providers via Microsoft.Extensions.AI with SK middleware
 2. MCP server integration via SK plugin wrappers and function factories
 3. Sub-workflow composition through SK automatic planning and function orchestration
-4. Advanced caching and memory via SK Vector Store connectors
+4. Advanced progress file management (cleanup, compression, backup)
 5. Comprehensive observability via SK built-in telemetry and instrumentation
 
 ### Phase 4: Polish & Optimization - SK Performance Tuning
@@ -703,8 +713,8 @@ public class SkWorkflowCacheManager
 2. Comprehensive testing with SK-aware mocks and test harnesses
 3. Documentation and examples using SK standard patterns and best practices
 4. Community feedback integration with SK plugin contribution guidelines
-5. Advanced SK features: custom filters, specialized vector stores, and enterprise integrations
+5. Advanced SK features: custom filters, progress management optimizations, and enterprise integrations
 
 ---
 
-*This architecture maximizes Semantic Kernel's comprehensive capabilities, resulting in dramatically reduced code complexity, enhanced reliability, and enterprise-grade features. By leveraging SK's full ecosystem - from function calling and planning to vector stores and observability - we achieve a robust, maintainable, and highly capable system with minimal custom infrastructure code.*
+*This architecture maximizes Semantic Kernel's comprehensive capabilities while using simple, maintainable file-based progress storage. By leveraging SK's function calling, planning, and ChatHistory management with straightforward JSON persistence, we achieve a robust, maintainable, and highly capable system with minimal infrastructure complexity.*
