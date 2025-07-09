@@ -45,9 +45,11 @@ input:
     output_directory:
       type: string  
       description: "Directory for generated documentation"
+      default: "./generated-docs"  # Schema-level default (takes precedence)
     include_dependencies:
       type: boolean
       description: "Include dependency analysis in the output"
+      # Uses workflow-level default since no schema-level default specified
 
 # Output Format
 output:
@@ -136,6 +138,8 @@ Based on the analysis results, generate comprehensive documentation:
 - Document the project architecture with diagrams
 - Create developer onboarding documentation
 
+The analysis will use depth setting: `{{analysis_depth}}` (resolved from schema-level default: "comprehensive")
+
 ## Validation Phase
 
 Finally, validate all generated documentation:
@@ -198,6 +202,41 @@ Finally, validate all generated documentation for consistency and completeness.
 
 ## Parameter Substitution
 
+### Default Value Precedence
+
+According to the dotprompt specification, parameter defaults can be specified in multiple locations with the following precedence hierarchy (highest to lowest priority):
+
+1. **CLI Parameters** (highest priority) - Values passed via command line flags
+2. **Schema-level Defaults** - `input.schema.{parameter}.default`
+3. **Workflow-level Defaults** - `input.default.{parameter}`
+4. **No Value** - Parameter remains undefined in template context
+
+#### Example with Precedence:
+```yaml
+input:
+  default:
+    query: "Default search query"           # Priority 3: Workflow-level
+    format: "markdown"                      # Priority 3: Only location
+  schema:
+    query:
+      type: string
+      description: "Search query parameter"
+      default: "Schema-level query"         # Priority 2: Takes precedence over workflow-level
+    format:
+      type: string
+      description: "Output format"
+      # Uses workflow-level default since no schema-level default
+    custom_param:
+      type: string
+      description: "Custom parameter"
+      default: "Schema-only default"        # Priority 2: Only location
+```
+
+**Resolved Values:**
+- `query`: `"Schema-level query"` (schema-level takes precedence)
+- `format`: `"markdown"` (workflow-level, no schema conflict)
+- `custom_param`: `"Schema-only default"` (schema-level only)
+
 ### Standard Parameter References
 - `{{parameter_name}}`: Direct parameter substitution from input schema
 - `{{analysis_result.property}}`: Access to previous tool results
@@ -232,6 +271,7 @@ for {{project_config.target_framework}} with options: {{build_options}}
 2. **Model specification**: Either in `model` field or global configuration
 3. **Input schema validation**: Parameters must match defined input schema
 4. **Tool dependencies**: All referenced tools must be available (built-in or MCP)
+5. **Default value consistency**: Schema-level and workflow-level defaults should not conflict
 
 ### Optional Elements
 - Frontmatter can be completely omitted for simple workflows
@@ -249,11 +289,25 @@ dotnet prompt validate workflow.prompt.md
 - Sub-workflow reference syntax
 - Tool reference validation
 
+#### Advanced Validation
+```bash
+# Check for default value conflicts
+dotnet prompt validate workflow.prompt.md --check-defaults
+
+# Validate with specific warnings
+dotnet prompt validate workflow.prompt.md --warnings=all
+
+# Validate parameter usage throughout workflow
+dotnet prompt validate workflow.prompt.md --check-parameter-usage
+```
+
 #### Semantic Validation
 - Parameter type checking
 - Tool availability verification
 - Sub-workflow dependency validation
 - Model/provider compatibility
+- **Default value conflict detection**: Warns when same parameter has different defaults in multiple locations
+- **Default value redundancy check**: Identifies unnecessary duplication of identical defaults
 
 #### Runtime Validation
 - File path existence (for file parameters)
@@ -305,6 +359,7 @@ input:
     include_dependencies: true
     include_tests: true
     output_format: "markdown"
+    analysis_depth: "standard"  # Will be overridden by schema-level default
   schema:
     project_path:
       type: string
@@ -315,13 +370,21 @@ input:
     include_dependencies:
       type: boolean
       description: "Include dependency analysis"
+      # Uses workflow-level default: true
     include_tests:
       type: boolean
       description: "Include test analysis"
+      # Uses workflow-level default: true
     output_format:
       type: string
       enum: ["markdown", "json", "html"]
       description: "Format for analysis output"
+      # Uses workflow-level default: "markdown"
+    analysis_depth:
+      type: string
+      enum: ["basic", "standard", "comprehensive"]
+      description: "Depth of analysis to perform"
+      default: "comprehensive"  # Schema-level default takes precedence
 
 output:
   format: json

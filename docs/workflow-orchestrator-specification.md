@@ -2,7 +2,21 @@
 
 ## Overview
 
-This document defines the `IWorkflowOrchestrator` interface and its Semantic Kernel-based implementation (`SemanticKernelOrchestrator`), which serves as the core workflow execution engine leveraging SK's native Handlebars templating, automatic function calling, and conversation state management.
+This document defines the `IWorkflow            // 4. Convert context variables to KernelArguments
+            var kernelArgs = ConvertToKernelArguments(context);
+
+            // 5. Create function from template using SK's Handlebars factory
+            var workflowFunction = _kernel.CreateFunctionFromPrompt(promptConfig, _handlebarsFactory);
+
+            // 6. Configure execution settings
+            var executionSettings = CreateExecutionSettings(workflow);
+
+            // 7. Setup conversation for resume capability
+            var workflowId = GenerateWorkflowId(workflow, context);
+            var chatHistory = await GetChatHistoryAsync(workflowId);
+
+            // 8. Execute with SK's automatic function calling and Handlebars rendering
+            _logger.LogInformation("Executing workflow with SK Handlebars templating and function calling");nterface and its Semantic Kernel-based implementation (`SemanticKernelOrchestrator`), which serves as the core workflow execution engine leveraging SK's native Handlebars templating, automatic function calling, and conversation state management.
 
 ## Status
 ✅ **COMPLETE** - SK-native orchestrator architecture defined
@@ -111,7 +125,10 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             // 1. Initialize Kernel with plugins
             _kernel ??= await _kernelFactory.CreateKernelAsync();
 
-            // 2. Create Handlebars template from workflow content
+            // 2. Apply input default values from workflow specification
+            ApplyInputDefaults(workflow, context);
+
+            // 3. Create Handlebars template from workflow content
             var promptConfig = new PromptTemplateConfig
             {
                 Template = workflow.Content?.RawMarkdown ?? throw new ArgumentException("Workflow content is required"),
@@ -120,7 +137,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 Description = workflow.Metadata?.Description ?? "Workflow execution"
             };
 
-            // 3. Convert context variables to KernelArguments
+            // 4. Convert context variables to KernelArguments
             var kernelArgs = ConvertToKernelArguments(context);
 
             // 4. Create function from template using SK's Handlebars factory
@@ -276,6 +293,69 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
     }
 
     // Private helper methods
+    private void ApplyInputDefaults(DotpromptWorkflow workflow, WorkflowExecutionContext context)
+    {
+        if (workflow.Input == null) return;
+
+        _logger.LogDebug("Applying input defaults from workflow specification");
+
+        // Step 1: Collect all parameter names from both locations
+        var allParameters = new HashSet<string>();
+        
+        // From workflow-level defaults
+        if (workflow.Input.Default != null)
+        {
+            foreach (var param in workflow.Input.Default.Keys)
+                allParameters.Add(param);
+        }
+        
+        // From schema definitions
+        if (workflow.Input.Schema != null)
+        {
+            foreach (var param in workflow.Input.Schema.Keys)
+                allParameters.Add(param);
+        }
+
+        // Step 2: Resolve each parameter using dotprompt precedence hierarchy
+        foreach (var paramName in allParameters)
+        {
+            // Skip if already set in context (CLI parameters take highest precedence)
+            if (context.Variables.ContainsKey(paramName))
+            {
+                _logger.LogDebug("Parameter '{ParameterName}' already set in context, skipping defaults", paramName);
+                continue;
+            }
+
+            object? resolvedValue = null;
+
+            // Priority 1: Schema-level default (input.schema.{param}.default)
+            if (workflow.Input.Schema?.TryGetValue(paramName, out var schema) == true 
+                && schema.Default != null)
+            {
+                resolvedValue = schema.Default;
+                _logger.LogDebug("Applied schema-level default for parameter '{ParameterName}': {Value}", 
+                    paramName, resolvedValue);
+            }
+            
+            // Priority 2: Workflow-level default (input.default.{param}) - only if not already resolved
+            else if (workflow.Input.Default?.TryGetValue(paramName, out var workflowDefault) == true)
+            {
+                resolvedValue = workflowDefault;
+                _logger.LogDebug("Applied workflow-level default for parameter '{ParameterName}': {Value}", 
+                    paramName, resolvedValue);
+            }
+
+            // Apply resolved value to context
+            if (resolvedValue != null)
+            {
+                context.SetVariable(paramName, resolvedValue);
+            }
+        }
+
+        _logger.LogInformation("Applied defaults for {Count} parameters from workflow specification", 
+            allParameters.Count(p => context.Variables.ContainsKey(p)));
+    }
+
     private KernelArguments ConvertToKernelArguments(WorkflowExecutionContext context)
     {
         var args = new KernelArguments();
@@ -336,6 +416,39 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             if (!definedParameters.Contains(param))
             {
                 warnings.Add($"Parameter '{param}' is referenced but not defined in input schema");
+            }
+        }
+
+        // Validate conflicting default values
+        ValidateConflictingDefaults(workflow, warnings);
+    }
+
+    private void ValidateConflictingDefaults(DotpromptWorkflow workflow, List<string> warnings)
+    {
+        if (workflow.Input?.Default == null || workflow.Input?.Schema == null)
+            return;
+
+        foreach (var defaultParam in workflow.Input.Default.Keys)
+        {
+            if (workflow.Input.Schema.TryGetValue(defaultParam, out var schema) 
+                && schema.Default != null)
+            {
+                // Check if values are different
+                var workflowDefault = workflow.Input.Default[defaultParam];
+                var schemaDefault = schema.Default;
+                
+                if (!Equals(workflowDefault, schemaDefault))
+                {
+                    warnings.Add($"Parameter '{defaultParam}' has conflicting defaults: " +
+                        $"input.default = '{workflowDefault}', input.schema.{defaultParam}.default = '{schemaDefault}'. " +
+                        $"Schema-level default will take precedence per dotprompt specification.");
+                }
+                else
+                {
+                    warnings.Add($"Parameter '{defaultParam}' has redundant defaults specified in both " +
+                        $"input.default and input.schema.{defaultParam}.default. " +
+                        $"Consider using only one location for clarity.");
+                }
             }
         }
     }
