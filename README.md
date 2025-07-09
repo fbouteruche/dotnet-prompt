@@ -14,13 +14,7 @@ A powerful CLI tool for .NET developers to execute AI-powered workflows using ma
 - [📋 Core Commands](#-core-commands)
   - [Workflow Execution](#workflow-execution)
   - [Dependency Management](#dependency-management)
-  - [Workflow Discovery & Validation](#wor- Community feedback integration
-
-[↑ Back to Top](#table-of-contents)
-
----
-
-**Built with ❤️ for the .NET community**-discovery--validation)
+  - [Workflow Discovery & Validation](#workflow-discovery--validation)
   - [Resume Interrupted Workflows](#resume-interrupted-workflows)
   - [Configuration Management](#configuration-management)
 - [🏗️ Architecture](#️-architecture)
@@ -89,42 +83,57 @@ dotnet tool install -g dotnet-prompt
 dotnet prompt --version
 ```
 
+> **New to dotnet-prompt?** Check out our comprehensive [Getting Started Guide](./docs/user-guide/getting-started.md) for a step-by-step tutorial!
+
 ### Basic Usage
 
-1. **Create a workflow file** (`analyze-project.prompt.md`):
+1. **Create a workflow file** (`my-first-workflow.prompt.md`):
 
 ```yaml
 ---
+name: "my-first-workflow"
 model: "gpt-4o"
-tools: ["project-analysis", "build-test"]
+tools: ["file_write"]
+
+config:
+  temperature: 0.7
+  maxOutputTokens: 500
+
+metadata:
+  description: "Simple hello world greeting workflow"
+  author: "dotnet-prompt team"
+  version: "1.0.0"
+  tags: ["hello", "example", "basic"]
 ---
 
-# Project Analysis Workflow
+# Hello World Workflow
 
-Please analyze the current .NET project and provide a comprehensive report including:
-- Project structure and architecture
-- Dependencies and potential vulnerabilities  
-- Code quality metrics
-- Test coverage analysis
-
-Generate documentation and suggest improvements where needed.
+Write me a hello world poem and use the `file_write` tool to save it to `./hello-world.txt`.
+The poem should be creative and engaging, showcasing the beauty of a simple greeting.
 ```
 
 2. **Execute the workflow**:
 
 ```bash
 # Basic execution
-dotnet prompt run analyze-project.prompt.md
+dotnet prompt run my-first-workflow.prompt.md
 
 # Dry run (validation only)
-dotnet prompt run analyze-project.prompt.md --dry-run
+dotnet prompt run my-first-workflow.prompt.md --dry-run
 
 # With verbose output
-dotnet prompt run analyze-project.prompt.md --verbose
+dotnet prompt run my-first-workflow.prompt.md --verbose
 
-# With custom context and timeout
-dotnet prompt run analyze-project.prompt.md --context ./src --timeout 600
+# Validate the workflow without running it
+dotnet prompt run my-first-workflow.prompt.md --dry-run
 ```
+
+3. **Check the results**:
+
+After running successfully, you should see:
+- Console output with the generated poem
+- A new file `hello-world.txt` containing your personalized poem
+- Progress file `my-first-workflow.progress.md` for resume capability
 
 ### CLI Commands
 
@@ -156,18 +165,6 @@ export DOTNET_PROMPT_TIMEOUT=300
 
 # Disable telemetry
 export DOTNET_PROMPT_NO_TELEMETRY=true
-```
-
-2. **Execute the workflow**:
-
-```bash
-dotnet prompt run analyze-project.prompt.md
-```
-
-3. **Execute with context**:
-
-```bash
-dotnet prompt run analyze-project.prompt.md --context ./src --project MyApp.csproj
 ```
 
 [↑ Back to Top](#table-of-contents)
