@@ -260,7 +260,11 @@ dotnet-prompt is built on **Clean Architecture** principles with comprehensive *
 
 ## 📁 Workflow Format
 
-Workflows are markdown files with YAML frontmatter following the dotprompt specification:
+dotnet-prompt uses the **dotprompt format** - a standardized format that combines YAML frontmatter with Markdown content. This format is based on the [official dotprompt specification](https://google.github.io/dotprompt/reference/frontmatter/) with extensions for .NET development scenarios.
+
+Workflow files are markdown files ending with `.prompt.md` that contain:
+- **YAML frontmatter**: Configuration, model settings, and tool declarations
+- **Markdown content**: Natural language instructions describing what you want to accomplish
 
 ```yaml
 ---
@@ -298,6 +302,8 @@ dotnet-prompt.sub-workflows:
 
 Analyze the project at `{{project_path}}` and generate comprehensive documentation...
 ```
+
+> **📖 Complete Format Documentation**: For comprehensive details on the dotprompt format including all available fields, parameter substitution, conditional content, and advanced features, see our [Dotprompt Format Guide](./docs/user-guide/dotprompt-format.md).
 
 [↑ Back to Top](#table-of-contents)
 
