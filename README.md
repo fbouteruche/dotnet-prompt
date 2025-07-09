@@ -2,6 +2,66 @@
 
 A powerful CLI tool for .NET developers to execute AI-powered workflows using markdown files with YAML frontmatter. Built on Microsoft Semantic Kernel with comprehensive tool integration and workflow composition capabilities.
 
+## Table of Contents
+
+- [🎯 Overview](#-overview)
+  - [Key Features](#key-features)
+- [🚀 Quick Start](#-quick-start)
+  - [Installation](#installation)
+  - [Basic Usage](#basic-usage)
+  - [CLI Commands](#cli-commands)
+  - [Environment Variables](#environment-variables)
+- [📋 Core Commands](#-core-commands)
+  - [Workflow Execution](#workflow-execution)
+  - [Dependency Management](#dependency-management)
+  - [Workflow Discovery & Validation](#wor- Community feedback integration
+
+[↑ Back to Top](#table-of-contents)
+
+---
+
+**Built with ❤️ for the .NET community**-discovery--validation)
+  - [Resume Interrupted Workflows](#resume-interrupted-workflows)
+  - [Configuration Management](#configuration-management)
+- [🏗️ Architecture](#️-architecture)
+  - [Key Technologies](#key-technologies)
+- [📁 Workflow Format](#-workflow-format)
+- [🔧 Built-in Tools](#-built-in-tools)
+  - [Project Analysis Tool](#project-analysis-tool)
+  - [Build & Test Tool](#build--test-tool)
+  - [File System Tool](#file-system-tool)
+- [🔌 Extensibility](#-extensibility)
+  - [MCP Server Integration](#mcp-server-integration)
+  - [Sub-workflow Composition](#sub-workflow-composition)
+- [⚙️ Configuration](#️-configuration)
+  - [Global Configuration Example](#global-configuration-example)
+- [🔄 Progress & Resume](#-progress--resume)
+- [🔒 Security & Trust Model](#-security--trust-model)
+- [🌟 Use Cases](#-use-cases)
+  - [Code Generation & Analysis](#code-generation--analysis)
+  - [Documentation Generation](#documentation-generation)
+  - [DevOps Automation](#devops-automation)
+- [🛠️ Development Status](#️-development-status)
+- [📚 Documentation](#-documentation)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🔨 How to Build and Test](#-how-to-build-and-test)
+  - [Prerequisites](#prerequisites)
+  - [Building the Project](#building-the-project)
+  - [Running Tests](#running-tests)
+  - [Local Development and Testing](#local-development-and-testing)
+  - [Updating Local Installation](#updating-local-installation)
+  - [Development Workflow](#development-workflow)
+  - [Project Structure](#project-structure)
+  - [Troubleshooting](#troubleshooting)
+- [🚧 Implementation Roadmap](#-implementation-roadmap)
+  - [Phase 1: Foundation (MVP)](#phase-1-foundation-mvp)
+  - [Phase 2: Core Functionality](#phase-2-core-functionality)
+  - [Phase 3: Extensibility](#phase-3-extensibility)
+  - [Phase 4: Polish & Optimization](#phase-4-polish--optimization)
+
+---
+
 ## 🎯 Overview
 
 dotnet-prompt enables developers to create and execute sophisticated AI workflows that can analyze projects, generate code, run tests, and automate development tasks. It follows the [dotprompt format specification](https://google.github.io/dotprompt/reference/frontmatter/) and integrates seamlessly with the .NET ecosystem.
@@ -14,6 +74,8 @@ dotnet-prompt enables developers to create and execute sophisticated AI workflow
 - **📝 Standard Format**: Compatible with dotprompt specification for portability
 - **🔄 Resume Capability**: Automatically resume interrupted workflows from checkpoints
 - **🎛️ Multiple AI Providers**: Support for GitHub Models, OpenAI, Azure OpenAI, Anthropic, and local models
+
+[↑ Back to Top](#table-of-contents)
 
 ## 🚀 Quick Start
 
@@ -108,6 +170,8 @@ dotnet prompt run analyze-project.prompt.md
 dotnet prompt run analyze-project.prompt.md --context ./src --project MyApp.csproj
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 📋 Core Commands
 
 ### Workflow Execution
@@ -164,6 +228,8 @@ dotnet prompt config set default_provider openai --global
 dotnet prompt init --provider azure
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🏗️ Architecture
 
 dotnet-prompt is built on **Clean Architecture** principles with comprehensive **Semantic Kernel** integration:
@@ -190,6 +256,8 @@ dotnet-prompt is built on **Clean Architecture** principles with comprehensive *
 - **System.CommandLine**: Robust CLI functionality
 - **MCP (Model Context Protocol)**: Extensible tool ecosystem
 - **.NET 8+**: Modern C# and latest language features
+
+[↑ Back to Top](#table-of-contents)
 
 ## 📁 Workflow Format
 
@@ -231,6 +299,8 @@ dotnet-prompt.sub-workflows:
 
 Analyze the project at `{{project_path}}` and generate comprehensive documentation...
 ```
+
+[↑ Back to Top](#table-of-contents)
 
 ## 🔧 Built-in Tools
 
@@ -284,6 +354,8 @@ Secure file and directory operations:
 }}
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🔌 Extensibility
 
 ### MCP Server Integration
@@ -323,6 +395,8 @@ Then generate documentation:
 > Parameters: metadata="{{analysis_result}}"
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## ⚙️ Configuration
 
 Configuration follows a hierarchical merge strategy:
@@ -360,6 +434,8 @@ Configuration follows a hierarchical merge strategy:
 }
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🔄 Progress & Resume
 
 Workflows automatically create progress files for resumption:
@@ -374,6 +450,8 @@ Workflows automatically create progress files for resumption:
 dotnet prompt resume long-running-workflow.prompt.md
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🔒 Security & Trust Model
 
 dotnet-prompt operates under a **full trust** security model:
@@ -382,6 +460,8 @@ dotnet-prompt operates under a **full trust** security model:
 - **User Responsibility**: No automatic safety restrictions
 - **Secure Configuration**: API keys encrypted and stored securely
 - **Audit Logging**: Optional comprehensive operation logging
+
+[↑ Back to Top](#table-of-contents)
 
 ## 🌟 Use Cases
 
@@ -428,6 +508,8 @@ Analyze the project and generate:
 - Deployment scripts
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🛠️ Development Status
 
 | Component | Status | Description |
@@ -441,6 +523,8 @@ Analyze the project and generate:
 | ✅ MCP Integration | Complete | Model Context Protocol support |
 | ✅ Progress/Resume | Complete | Checkpoint and resume capabilities |
 | ✅ Error Handling | Complete | Comprehensive error management |
+
+[↑ Back to Top](#table-of-contents)
 
 ## 📚 Documentation
 
@@ -456,6 +540,8 @@ Comprehensive documentation is available in the `/docs` directory:
 - **[Progress & Resume](./docs/progress-resume-specification.md)**: Checkpoint system
 - **[Error Handling](./docs/error-handling-logging-specification.md)**: Error management and logging
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🤝 Contributing
 
 dotnet-prompt is designed for extensibility and community contributions:
@@ -465,9 +551,13 @@ dotnet-prompt is designed for extensibility and community contributions:
 - **Built-in Tools**: Contribute core .NET development tools
 - **Documentation**: Improve guides and examples
 
+[↑ Back to Top](#table-of-contents)
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+[↑ Back to Top](#table-of-contents)
 
 ## 🔨 How to Build and Test
 
@@ -596,25 +686,27 @@ dotnet build
 dotnet restore
 ```
 
+[↑ Back to Top](#table-of-contents)
+
 ## 🚧 Implementation Roadmap
 
 ### Phase 1: Foundation (MVP)
 - [x] Core domain models and CLI structure
 - [x] Configuration hierarchy implementation
 - [x] Workflow parsing and validation
-- [ ] Basic execution engine
+- [x] Basic execution engine
 
 ### Phase 2: Core Functionality  
-- [ ] GitHub Models provider implementation
-- [ ] Built-in tools (Project Analysis, Build & Test, File System)
-- [ ] Progress tracking and resume
-- [ ] Basic workflow execution
+- [x] GitHub Models provider implementation
+- [🚧] Built-in tools (Project Analysis, Build & Test, File System)
+- [x] Progress tracking and resume
+- [x] Basic workflow execution
 
 ### Phase 3: Extensibility
-- [ ] Additional AI providers (OpenAI, Azure, Anthropic, Local)
-- [ ] MCP server integration
-- [ ] Sub-workflow composition
-- [ ] Advanced error handling
+- [x] Additional AI providers (OpenAI, Azure, Anthropic, Local)
+- [🚧] MCP server integration
+- [x] Sub-workflow composition
+- [x] Advanced error handling
 
 ### Phase 4: Polish & Optimization
 - [ ] Performance optimizations
