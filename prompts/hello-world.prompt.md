@@ -1,6 +1,7 @@
 ---
 name: "hello-world"
 model: "gpt-4o"
+tools: ["file_write"]
 config:
   temperature: 0.7
   maxOutputTokens: 500
@@ -13,13 +14,5 @@ metadata:
 
 # Hello World Workflow
 
-Welcome to dotnet-prompt! This is a simple example workflow to test basic functionality.
-
-Please respond with a friendly greeting and explain what dotnet-prompt is designed to do.
-
-Include information about:
-- What dotnet-prompt helps .NET developers accomplish
-- The key features that make it useful
-- An encouraging message for getting started
-
-Keep the response concise and welcoming for new users.
+Write me an hello world poem and use the `file_write` tool to save it to `./hello-world.txt`.
+The poem should be creative and engaging, showcasing the beauty of a simple greeting.
