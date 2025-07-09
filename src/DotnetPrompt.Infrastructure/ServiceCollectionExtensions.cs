@@ -112,11 +112,11 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddMcpIntegrationServices(this IServiceCollection services)
     {
-        // Core MCP services
+        // Core MCP services using official SDK
         services.AddSingleton<McpConnectionTypeDetector>();
         services.AddSingleton<McpServerResolver>();
         services.AddSingleton<McpConfigurationService>();
-        services.AddSingleton<IMcpClientFactory, McpClientFactory>();
+        // Note: With official MCP SDK, McpClientFactory.CreateAsync() is used directly
         
         // MCP execution filter for error handling
         services.AddSingleton<McpExecutionFilter>();
