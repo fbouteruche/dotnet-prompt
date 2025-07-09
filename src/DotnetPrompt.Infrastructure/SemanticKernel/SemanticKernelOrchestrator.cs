@@ -48,8 +48,8 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             _logger.LogInformation("Starting SK-native workflow execution with Handlebars templating: {WorkflowName}", 
                 workflow.Name ?? "unnamed");
             
-            // 1. Get or create kernel with required plugins
-            _kernel ??= await _kernelFactory.CreateKernelAsync();
+            // 1. Get or create kernel with required plugins and MCP servers from workflow
+            _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow);
 
             // 2. Create SK Handlebars template configuration
             var promptConfig = new PromptTemplateConfig
@@ -172,7 +172,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                     var template = _handlebarsFactory.Create(promptConfig);
                     
                     // Test render to validate variable references
-                    await template.RenderAsync(_kernel ?? await _kernelFactory.CreateKernelAsync(), kernelArgs, cancellationToken);
+                    await template.RenderAsync(_kernel ?? await _kernelFactory.CreateKernelWithWorkflowAsync(workflow), kernelArgs, cancellationToken);
                     
                     _logger.LogDebug("SK Handlebars template validation passed");
                 }
@@ -195,7 +195,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             {
                 try
                 {
-                    _kernel ??= await _kernelFactory.CreateKernelAsync();
+                    _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow);
                     
                     // Validate available functions in kernel
                     var availableFunctions = _kernel.Plugins.GetFunctionsMetadata();
@@ -287,8 +287,8 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 throw new InvalidOperationException($"Workflow has changed significantly and may not be compatible for resume. WorkflowId: {workflowId}");
             }
 
-            // 3. Get or create kernel with required plugins
-            _kernel ??= await _kernelFactory.CreateKernelAsync();
+            // 3. Get or create kernel with required plugins and MCP servers from workflow
+            _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow);
 
             // 4. Restore conversation state
             _conversationStore[workflowId] = restoredChatHistory;

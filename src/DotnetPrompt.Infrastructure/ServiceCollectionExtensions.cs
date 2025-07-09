@@ -2,6 +2,7 @@ using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Infrastructure.Configuration;
 using DotnetPrompt.Infrastructure.Extensions;
 using DotnetPrompt.Infrastructure.Filters;
+using DotnetPrompt.Infrastructure.Mcp;
 using DotnetPrompt.Infrastructure.Middleware;
 using DotnetPrompt.Infrastructure.Models;
 using DotnetPrompt.Infrastructure.Progress;
@@ -82,7 +83,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds Semantic Kernel orchestrator services with native Handlebars templating
+    /// Adds Semantic Kernel orchestrator services with native Handlebars templating and MCP integration
     /// This replaces custom variable substitution with SK native capabilities
     /// </summary>
     /// <param name="services">The service collection</param>
@@ -95,8 +96,30 @@ public static class ServiceCollectionExtensions
         // Register orchestrator (replaces WorkflowExecutorPlugin usage)
         services.AddScoped<IWorkflowOrchestrator, SemanticKernelOrchestrator>();
         
-        // Register kernel factory (no MCP yet)
+        // Register kernel factory with MCP support
         services.AddSingleton<IKernelFactory, KernelFactory>();
+        
+        // Add MCP integration services
+        services.AddMcpIntegrationServices();
+        
+        return services;
+    }
+
+    /// <summary>
+    /// Adds MCP (Model Context Protocol) integration services
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection for chaining</returns>
+    public static IServiceCollection AddMcpIntegrationServices(this IServiceCollection services)
+    {
+        // Core MCP services
+        services.AddSingleton<McpConnectionTypeDetector>();
+        services.AddSingleton<McpServerResolver>();
+        services.AddSingleton<McpConfigurationService>();
+        services.AddSingleton<IMcpClientFactory, McpClientFactory>();
+        
+        // MCP execution filter for error handling
+        services.AddSingleton<McpExecutionFilter>();
         
         return services;
     }
