@@ -9,20 +9,26 @@ This document defines the Model Context Protocol (MCP) integration using the **o
 
 ## Architecture Decision: Official MCP SDK Required
 
-**MANDATORY**: This implementation **MUST** use the official `ModelContextProtocol` NuGet package from Microsoft, following the patterns demonstrated in the [Microsoft DevBlogs MCP integration guide](https://devblogs.microsoft.com/semantic-kernel/integrating-model-context-protocol-tools-with-semantic-kernel-a-step-by-Step-guide/).
+**MANDATORY**: This implementation **MUST** use the official `ModelContextProtocol` NuGet package from the [Model Context Protocol C# SDK](https://github.com/modelcontextprotocol/csharp-sdk), following the patterns demonstrated in the [Microsoft DevBlogs MCP integration guide](https://devblogs.microsoft.com/semantic-kernel/integrating-model-context-protocol-tools-with-semantic-kernel-a-step-by-Step-guide/).
 
 ### Key Requirements:
-- ✅ **Use Official SDK**: `ModelContextProtocol` NuGet package for all MCP communication
-- ✅ **Use SK Extensions**: Leverage `.AsKernelFunction()` extension method for tool conversion
-- ✅ **Follow DevBlogs Pattern**: Align with Microsoft's recommended MCP-SK integration approach
+- ✅ **Use Official SDK**: `ModelContextProtocol` NuGet package from https://github.com/modelcontextprotocol/csharp-sdk
+- ✅ **Use McpClientTool**: MCP tools are already `AIFunction` instances, ready for SK integration
+- ✅ **Use McpClientFactory**: Official factory pattern for creating MCP clients
+- ✅ **Follow Official API**: Align with the official SDK's client and transport patterns documented at https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.html
 - ✅ **Maintain Enterprise Features**: Preserve configuration-driven server management and error handling
+
+### API Reference
+- **Official C# SDK Documentation**: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.html
+- **GitHub Repository**: https://github.com/modelcontextprotocol/csharp-sdk
+- **Microsoft DevBlogs Guide**: https://devblogs.microsoft.com/semantic-kernel/integrating-model-context-protocol-tools-with-semantic-kernel-a-step-by-Step-guide/
 
 ## MCP-to-SK Plugin Architecture
 
 ### Core Integration Strategy (Official SDK First)
-- **Official MCP SDK**: Use `ModelContextProtocol` NuGet package for all MCP server communication
-- **SK Plugin Wrappers**: MCP servers are wrapped as SK plugins using official SDK capabilities
-- **Native Function Mapping**: MCP tools become SK functions using `.AsKernelFunction()` extension
+- **Official MCP SDK**: Use `ModelContextProtocol` NuGet package from https://github.com/modelcontextprotocol/csharp-sdk
+- **Direct AIFunction Integration**: MCP tools (`McpClientTool`) inherit from `AIFunction` and work directly with SK
+- **Native Client Factory**: Use `McpClientFactory.CreateAsync()` for client creation
 - **Configuration Layer**: YAML-based configuration system for enterprise server management
 - **Error Handling**: SK filters handle MCP communication errors and retries
 - **State Management**: SK conversation state includes MCP server connection status
@@ -40,36 +46,34 @@ public class OfficialMcpPluginFactory
     {
         // 1. Use official MCP client factory (NOT custom IMcpClient)
         var transport = CreateTransportFromConfig(serverConfig);
-        await using var mcpClient = await McpClientFactory.CreateAsync(transport);
+        var mcpClient = await McpClientFactory.CreateAsync(transport);
         
-        // 2. Use official tool discovery
-        var toolsResponse = await mcpClient.ListToolsAsync();
+        // 2. Use official tool discovery - returns McpClientTool instances (which are AIFunction)
+        var tools = await mcpClient.ListToolsAsync();
         
-        // 3. Use official SK extension method (NOT custom conversion)
-        var skFunctions = toolsResponse.Tools.Select(tool => tool.AsKernelFunction());
-        
-        // 4. Register as SK plugin with enterprise configuration
+        // 3. McpClientTool inherits from AIFunction, so they work directly with SK
+        // No conversion needed - they're already compatible!
         return KernelPluginFactory.CreateFromFunctions(
             serverConfig.PluginName,
             serverConfig.Description, 
-            skFunctions);
+            tools); // Direct use - tools are already AIFunction instances
     }
     
     private IClientTransport CreateTransportFromConfig(McpServerConfig config)
     {
         return config.ConnectionType switch
         {
-            McpConnectionType.Stdio => new StdioClientTransport(new()
+            McpConnectionType.Stdio => new StdioClientTransport(new StdioClientTransportOptions
             {
                 Name = config.Name,
                 Command = config.Command,
                 Arguments = config.Args,
-                WorkingDirectory = config.WorkingDirectory
+                Environment = null, // Add if needed
             }),
-            McpConnectionType.Sse => new SseClientTransport(new()
+            McpConnectionType.Sse => new SseClientTransport(new SseClientTransportOptions
             {
-                Url = config.Endpoint,
-                Headers = config.Headers
+                Uri = new Uri(config.Endpoint),
+                // Add other SSE options as needed
             }),
             _ => throw new ArgumentException($"Unsupported connection type: {config.ConnectionType}")
         };
@@ -130,14 +134,13 @@ public static class TransportConfigurationMapper
                 Name = config.Name,
                 Command = ResolveCommand(config), // Use existing server resolver
                 Arguments = config.Args ?? Array.Empty<string>(),
-                WorkingDirectory = config.WorkingDirectory
+                Environment = null, // Add environment variables if needed
             }),
             
             McpConnectionType.Sse => new SseClientTransport(new SseClientTransportOptions
             {
-                Url = config.Endpoint ?? config.Server,
-                Headers = ResolveHeaders(config), // Include auth resolution
-                Timeout = config.Timeout ?? TimeSpan.FromSeconds(30)
+                Uri = new Uri(config.Endpoint ?? config.Server ?? throw new InvalidOperationException("Endpoint required for SSE")),
+                // Add SSE-specific configuration as needed
             }),
             
             _ => throw new NotSupportedException($"Connection type {config.ConnectionType} not supported")
@@ -149,7 +152,7 @@ public static class TransportConfigurationMapper
 ## MCP-to-SK Function Registration (Official SDK Pattern)
 
 ### Official SDK Integration Pattern
-Following the [Microsoft DevBlogs guide](https://devblogs.microsoft.com/semantic-kernel/integrating-model-context-protocol-tools-with-semantic-kernel-a-step-by-step-guide/), the implementation **MUST** use the official MCP SDK pattern:
+Following the [official MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk), the implementation **MUST** use the official MCP SDK pattern where `McpClientTool` instances are already `AIFunction` compatible:
 
 ```csharp
 // ✅ MANDATORY: Official SDK usage pattern
@@ -165,19 +168,17 @@ public class McpWorkflowOrchestrator
             var transport = TransportConfigurationMapper.CreateTransport(config);
             
             // 2. Use official MCP client factory (NOT custom implementation)
-            await using var mcpClient = await McpClientFactory.CreateAsync(transport);
+            var mcpClient = await McpClientFactory.CreateAsync(transport);
             
-            // 3. Discover tools using official SDK
-            var toolsResponse = await mcpClient.ListToolsAsync();
+            // 3. Discover tools using official SDK - returns McpClientTool instances
+            var tools = await mcpClient.ListToolsAsync();
             
-            // 4. Convert to SK functions using official extension (NOT custom conversion)
-            var skFunctions = toolsResponse.Tools.Select(tool => tool.AsKernelFunction());
-            
-            // 5. Register as plugin with enterprise naming
-            kernel.Plugins.AddFromFunctions(config.PluginName, skFunctions);
+            // 4. McpClientTool inherits from AIFunction - direct SK compatibility!
+            // No conversion needed - they're already compatible with SK
+            kernel.Plugins.AddFromFunctions(config.PluginName, tools);
             
             _logger.LogInformation("Registered MCP server {ServerName} with {ToolCount} tools", 
-                config.Name, toolsResponse.Tools.Count());
+                config.Name, tools.Count);
         }
         
         return kernel;
@@ -194,8 +195,8 @@ public class McpWorkflowOrchestrator
 - ❌ Custom `McpTool` and `McpToolResult` models
 
 **REPLACE** with official SDK:
-- ✅ `ModelContextProtocol.IMcpClient` from official NuGet package
-- ✅ `tool.AsKernelFunction()` extension method
+- ✅ `IMcpClient` from official NuGet package
+- ✅ `McpClientTool` (already `AIFunction` instances)
 - ✅ Official MCP data models and transport abstractions
 
 ### Enterprise Configuration Integration
@@ -235,12 +236,11 @@ public class EnterpriseWorkflowOrchestrator
                 var transport = TransportConfigurationMapper.CreateTransport(config);
                 
                 // 4. Use official MCP client (NOT custom implementation)
-                await using var mcpClient = await McpClientFactory.CreateAsync(transport);
+                var mcpClient = await McpClientFactory.CreateAsync(transport);
                 
-                // 5. Register tools using official SK extension
+                // 5. Register tools using direct compatibility - McpClientTool is AIFunction
                 var tools = await mcpClient.ListToolsAsync();
-                kernel.Plugins.AddFromFunctions(config.PluginName, 
-                    tools.Tools.Select(t => t.AsKernelFunction()));
+                kernel.Plugins.AddFromFunctions(config.PluginName, tools);
                 
                 _logger.LogInformation("Successfully registered MCP server: {ServerName}", config.Name);
             }
@@ -258,14 +258,15 @@ public class EnterpriseWorkflowOrchestrator
 
 ## Parameter Mapping and Type Conversion (Official SDK Automatic)
 
-### Official SDK Handles Parameter Mapping
-The official MCP SDK and `.AsKernelFunction()` extension automatically handle:
-- ✅ **Automatic Type Conversion**: String, number, boolean, object conversions
-- ✅ **Schema Validation**: MCP tool input schema validation
-- ✅ **Parameter Binding**: SK function parameter binding from MCP schemas
-- ✅ **Return Type Handling**: Automatic result type conversion
+### Official SDK Handles Everything Automatically
+The official MCP SDK's `McpClientTool` instances handle all parameter mapping and type conversion automatically since they inherit from `AIFunction`:
+- ✅ **Direct AIFunction Compatibility**: `McpClientTool` inherits from `AIFunction` - no conversion needed
+- ✅ **Automatic Type Conversion**: String, number, boolean, object conversions handled by the SDK
+- ✅ **Schema Validation**: MCP tool input schema validation built into `McpClientTool`
+- ✅ **Parameter Binding**: SK function parameter binding works directly with `McpClientTool`
+- ✅ **Return Type Handling**: Automatic result type conversion built into the official SDK
 
-**NO CUSTOM PARAMETER MAPPING REQUIRED** - the official SDK handles this completely.
+**NO CUSTOM PARAMETER MAPPING REQUIRED** - the official SDK's `McpClientTool` handles this completely.
 
 ### Enterprise Validation Layer (Optional)
 ```csharp
