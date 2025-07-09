@@ -215,11 +215,22 @@ public class WorkflowExecutionFilter : IFunctionInvocationFilter
 <PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" />
 <PackageReference Include="Microsoft.Extensions.VectorData.Abstractions" />
 
+<!-- MCP Integration (Official SDK) -->
+<PackageReference Include="ModelContextProtocol" />
+
 <!-- Supporting Libraries -->
 <PackageReference Include="MediatR" />
 <PackageReference Include="Serilog" />
 <PackageReference Include="YamlDotNet" />
 ```
+
+### MCP Integration Guidelines
+- **Use Official MCP SDK**: Always use the official `ModelContextProtocol` NuGet package
+- **API Reference**: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.html
+- **GitHub Repository**: https://github.com/modelcontextprotocol/csharp-sdk
+- **SK Integration**: MCP tools (`McpClientTool`) inherit from `AIFunction` and work directly with SK
+- **Transport Layer**: Use `McpClientFactory.CreateAsync()` with `StdioClientTransport` or `SseClientTransport`
+- **Enterprise Features**: Preserve configuration-driven server management through custom mapping layers
 
 ### Avoid Custom Implementations
 - ❌ Custom AI provider abstractions (use Microsoft.Extensions.AI)
