@@ -20,7 +20,7 @@ dotnet prompt --version
 
 ## Your First Workflow
 
-Let's create a simple workflow that analyzes a .NET project:
+Let's start with a simple "Hello World" workflow that creates a personalized greeting:
 
 ### Step 1: Create a Workflow File
 
@@ -30,23 +30,23 @@ Create a file named `my-first-workflow.prompt.md`:
 ---
 name: "my-first-workflow"
 model: "gpt-4o"
-tools: ["project-analysis", "file-system"]
+tools: ["file_write"]
 
 config:
   temperature: 0.7
-  maxOutputTokens: 2000
+  maxOutputTokens: 500
+
+metadata:
+  description: "Simple hello world greeting workflow"
+  author: "dotnet-prompt team"
+  version: "1.0.0"
+  tags: ["hello", "example", "basic"]
 ---
 
-# My First Workflow
+# Hello World Workflow
 
-Please analyze the current .NET project and provide:
-
-1. **Project Overview**: What type of project is this?
-2. **Structure Analysis**: Key files and directories
-3. **Dependencies**: Main NuGet packages used
-4. **Recommendations**: Any suggestions for improvements
-
-Save the analysis report to `./analysis-report.md`.
+Write me a hello world poem and use the `file_write` tool to save it to `./hello-world.txt`.
+The poem should be creative and engaging, showcasing the beauty of a simple greeting.
 ```
 
 ### Step 2: Run the Workflow
@@ -65,8 +65,8 @@ dotnet prompt run my-first-workflow.prompt.md --dry-run
 ### Step 3: Check the Results
 
 After running successfully, you should see:
-- Console output with the analysis
-- A new file `analysis-report.md` with detailed results
+- Console output with the generated poem
+- A new file `hello-world.txt` containing your personalized poem
 - Progress file `my-first-workflow.progress.md` for resume capability
 
 ## Understanding the Workflow Format
@@ -95,60 +95,6 @@ Clear instructions for what you want the AI to accomplish.
 Use natural language to describe your goals and requirements.
 The AI will use the available tools to complete the tasks.
 ```
-
-## Common Use Cases
-
-### Code Analysis
-```yaml
----
-name: "code-review"
-model: "gpt-4o"
-tools: ["project-analysis", "file-system"]
----
-
-# Code Review
-
-Review the code in the current project for:
-- Code quality and best practices
-- Potential security issues
-- Performance improvements
-- Documentation gaps
-```
-
-### Documentation Generation
-```yaml
----
-name: "docs-generator"
-model: "gpt-4o" 
-tools: ["project-analysis", "file-system"]
----
-
-# Documentation Generator
-
-Generate comprehensive documentation including:
-- README with setup instructions
-- API documentation for public methods
-- Code examples and usage patterns
-```
-
-### Test Generation
-```yaml
----
-name: "test-generator"
-model: "gpt-4o"
-tools: ["project-analysis", "build-test", "file-system"]
----
-
-# Unit Test Generator
-
-Analyze the project and generate unit tests for:
-- All public methods in service classes
-- Controllers and their actions
-- Utility classes and helper methods
-
-Place tests in appropriate test projects with proper naming conventions.
-```
-
 ## Next Steps
 
 Now that you've created your first workflow, explore these guides:
