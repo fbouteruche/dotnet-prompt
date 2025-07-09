@@ -6,7 +6,6 @@ Complete reference for all built-in tools available in dotnet-prompt workflows. 
 
 Built-in tools are automatically available in all workflows. They provide:
 - **Project Analysis**: Comprehensive .NET project and solution analysis
-- **Build & Test**: Build, test, and publish operations
 - **File System**: Secure file and directory operations
 - **Sub-workflow**: Execute and compose other workflow files
 
@@ -20,7 +19,7 @@ Declare tools in your workflow frontmatter:
 ---
 name: "example-workflow"
 model: "gpt-4o"
-tools: ["project-analysis", "build-test", "file-system"]
+tools: ["project-analysis", "file-system"]
 ---
 ```
 
@@ -32,8 +31,6 @@ Tools are invoked through natural language in your workflow content:
 # Example Workflow
 
 Please analyze the current project structure and generate a report.
-
-Then build the project and run all tests.
 
 Finally, save the results to a new file called `results.md`.
 ```
@@ -196,189 +193,6 @@ The project analysis tool provides structured data that can be used by AI workfl
   ],
   "total_packages": 15,
   "outdated_packages": 2
-}
-```
-
-## Build & Test Tool
-
-**Tool Name**: `build-test`
-
-Provides .NET CLI build, test, and publish operations with comprehensive result reporting.
-
-### Capabilities
-
-#### Build Operations
-- Clean build processes
-- Multi-configuration builds (Debug/Release)
-- Framework-specific builds
-- Build error and warning analysis
-- Build performance metrics
-
-#### Test Operations
-- Unit test execution
-- Integration test execution
-- Test filtering and categorization
-- Test coverage collection
-- Test result analysis and reporting
-
-#### Publish Operations
-- Application publishing
-- Self-contained deployments
-- Framework-dependent deployments
-- Platform-specific builds
-
-#### Performance Analysis
-- Build time measurement
-- Test execution time analysis
-- Resource usage monitoring
-- Build artifact size analysis
-
-### Usage Examples
-
-#### Simple Build and Test
-```yaml
----
-name: "build-and-test"
-model: "gpt-4o"
-tools: ["build-test", "file-system"]
----
-
-# Build and Test
-
-Execute a complete build and test cycle:
-1. Clean any previous build artifacts
-2. Restore NuGet packages
-3. Build the project in Release configuration
-4. Run all unit tests
-5. Generate a summary report
-
-Save the build and test results to `build-report.md`.
-```
-
-#### Comprehensive CI/CD Build
-```yaml
----
-name: "ci-build"
-model: "gpt-4o"
-tools: ["build-test", "file-system"]
----
-
-# CI/CD Build Process
-
-Execute a comprehensive CI/CD build:
-
-## Build Phase
-1. Clean workspace
-2. Restore packages
-3. Build in Release configuration
-4. Analyze build warnings and errors
-
-## Test Phase
-5. Run unit tests with coverage
-6. Run integration tests
-7. Generate test reports
-
-## Quality Gates
-8. Verify test coverage meets minimum threshold (80%)
-9. Check for build warnings
-10. Validate all tests passed
-
-Generate a comprehensive CI/CD report with pass/fail status for each phase.
-```
-
-#### Multi-Platform Build
-```yaml
----
-name: "multi-platform-build"
-model: "gpt-4o"
-tools: ["build-test", "file-system"]
----
-
-# Multi-Platform Build
-
-Build the application for multiple platforms:
-1. Build for Windows (win-x64)
-2. Build for Linux (linux-x64)
-3. Build for macOS (osx-x64)
-4. Create self-contained deployments for each platform
-5. Generate deployment packages
-
-Analyze build results and create deployment documentation.
-```
-
-### Configuration Options
-
-Configure build and test behavior:
-
-```json
-{
-  "tool_configuration": {
-    "build_test": {
-      "default_configuration": "Release",
-      "enable_parallel_builds": true,
-      "test_timeout_seconds": 300,
-      "collect_coverage": true,
-      "coverage_threshold": 80,
-      "fail_on_warnings": false,
-      "restore_before_build": true,
-      "clean_before_build": true
-    }
-  }
-}
-```
-
-**Configuration Fields:**
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `default_configuration` | string | "Release" | Default build configuration |
-| `enable_parallel_builds` | boolean | true | Enable parallel project builds |
-| `test_timeout_seconds` | integer | 300 | Test execution timeout |
-| `collect_coverage` | boolean | true | Collect test coverage data |
-| `coverage_threshold` | integer | 80 | Minimum coverage percentage |
-| `fail_on_warnings` | boolean | false | Treat warnings as errors |
-| `restore_before_build` | boolean | true | Restore packages before build |
-| `clean_before_build` | boolean | true | Clean before build |
-
-### Build Commands
-
-The tool supports various .NET CLI operations:
-
-#### Build Commands
-- `dotnet clean` - Clean build artifacts
-- `dotnet restore` - Restore NuGet packages
-- `dotnet build` - Build the project
-- `dotnet publish` - Publish the application
-
-#### Test Commands
-- `dotnet test` - Run tests
-- `dotnet test --collect:"XPlat Code Coverage"` - Run with coverage
-- `dotnet test --filter Category=Unit` - Run filtered tests
-
-### Output Information
-
-#### Build Results
-```json
-{
-  "success": true,
-  "duration_seconds": 45.2,
-  "warnings": 2,
-  "errors": 0,
-  "artifacts": ["bin/Release/net8.0/MyApp.dll"],
-  "build_log": "Build succeeded with 2 warnings."
-}
-```
-
-#### Test Results
-```json
-{
-  "success": true,
-  "total_tests": 156,
-  "passed_tests": 154,
-  "failed_tests": 0,
-  "skipped_tests": 2,
-  "coverage_percentage": 87.5,
-  "duration_seconds": 23.1
 }
 ```
 
@@ -738,7 +552,7 @@ dotnet-prompt.sub-workflows:
 ---
 name: "comprehensive-analysis"
 model: "gpt-4o"
-tools: ["project-analysis", "build-test", "file-system"]
+tools: ["project-analysis", "file-system"]
 ---
 
 # Comprehensive Project Analysis
@@ -747,9 +561,6 @@ Perform complete project analysis using all available tools:
 
 ## Project Structure Analysis
 Use project analysis to understand the codebase structure, dependencies, and architecture.
-
-## Build and Test Validation
-Build the project and run tests to verify current functionality and identify issues.
 
 ## File System Review
 Examine configuration files, documentation, and project organization.
@@ -763,7 +574,7 @@ Generate a comprehensive report combining insights from all analysis tools with 
 ---
 name: "auto-improvement"
 model: "gpt-4o"
-tools: ["project-analysis", "build-test", "file-system", "sub-workflow"]
+tools: ["project-analysis", "file-system", "sub-workflow"]
 ---
 
 # Automated Project Improvement
@@ -772,21 +583,18 @@ Execute automated improvements based on analysis:
 
 ## Analysis Phase
 1. Analyze project structure and identify improvement opportunities
-2. Check build status and test coverage
-3. Review code quality and documentation
+2. Review code quality and documentation
 
 ## Improvement Phase
-4. Generate improved code files where beneficial
-5. Update configuration files for better practices
-6. Create or update documentation
-7. Add missing unit tests
+3. Generate improved code files where beneficial
+4. Update configuration files for better practices
+5. Create or update documentation
+6. Add missing unit tests
 
 ## Validation Phase
-8. Build the improved project
-9. Run all tests to ensure improvements don't break functionality
-10. Generate improvement summary report
+7. Generate improvement summary report
 
-Ensure all improvements are validated before completion.
+Ensure all improvements are documented for review.
 ```
 
 ### Tool-Specific Best Practices
@@ -796,12 +604,6 @@ Ensure all improvements are validated before completion.
 - Enable vulnerability checking for security-conscious projects
 - Configure appropriate file size limits for large codebases
 - Use excluded directories to skip generated code
-
-#### Build & Test Best Practices
-- Always clean before building in CI/CD scenarios
-- Set appropriate test timeouts for long-running tests
-- Enable code coverage collection for quality metrics
-- Use parallel builds for faster execution
 
 #### File System Best Practices
 - Enable backup creation for safety
@@ -839,17 +641,6 @@ Error: Access denied to file '/restricted/path'
 2. Verify file is within allowed paths
 3. Check file permissions
 4. Review file system tool configuration
-
-#### Build Failed
-```
-Error: Build failed with compilation errors
-```
-
-**Solutions:**
-1. Check project file syntax
-2. Verify dependencies are restored
-3. Check .NET SDK version compatibility
-4. Review build configuration settings
 
 #### Sub-workflow Not Found
 ```
