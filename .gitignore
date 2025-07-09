@@ -357,3 +357,6 @@ invalid.txt
 
 # Temporary files
 /tmp/
+
+# dotnet-prompt specific files
+.dotnet-prompt/
