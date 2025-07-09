@@ -132,6 +132,54 @@ public class DotpromptValidator
                 }
             }
         }
+
+        // Validate conflicting default values
+        ValidateConflictingDefaults(workflow, result);
+    }
+
+    /// <summary>
+    /// Validates that default values specified in multiple locations are consistent
+    /// </summary>
+    /// <param name="workflow">Workflow to validate</param>
+    /// <param name="result">Validation result to add warnings to</param>
+    private void ValidateConflictingDefaults(DotpromptWorkflow workflow, DotpromptValidationResult result)
+    {
+        if (workflow.Input?.Default == null || workflow.Input?.Schema == null)
+            return;
+
+        foreach (var defaultParam in workflow.Input.Default.Keys)
+        {
+            if (workflow.Input.Schema.TryGetValue(defaultParam, out var schema) 
+                && schema.Default != null)
+            {
+                // Check if values are different
+                var workflowDefault = workflow.Input.Default[defaultParam];
+                var schemaDefault = schema.Default;
+                
+                if (!Equals(workflowDefault, schemaDefault))
+                {
+                    result.Warnings.Add(new DotpromptValidationWarning
+                    {
+                        Message = $"Parameter '{defaultParam}' has conflicting defaults: " +
+                            $"input.default = '{workflowDefault}', input.schema.{defaultParam}.default = '{schemaDefault}'. " +
+                            $"Schema-level default will take precedence per dotprompt specification.",
+                        WarningCode = "CONFLICTING_DEFAULTS",
+                        Field = defaultParam
+                    });
+                }
+                else
+                {
+                    result.Warnings.Add(new DotpromptValidationWarning
+                    {
+                        Message = $"Parameter '{defaultParam}' has redundant defaults specified in both " +
+                            $"input.default and input.schema.{defaultParam}.default. " +
+                            $"Consider using only one location for clarity.",
+                        WarningCode = "REDUNDANT_DEFAULTS",
+                        Field = defaultParam
+                    });
+                }
+            }
+        }
     }
 
     private void ValidateToolDependencies(DotpromptWorkflow workflow, DotpromptValidationResult result)

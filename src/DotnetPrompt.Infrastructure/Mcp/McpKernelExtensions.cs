@@ -92,7 +92,26 @@ public static class McpKernelExtensions
             
             // 4. Discover tools using official SDK - returns McpClientTool instances (AIFunction)
             var tools = await mcpClient.ListToolsAsync();
+
+            // 4.1 Log discovered tools
+            if (tools == null || !tools.Any())
+            {
+                logger.LogWarning("No tools discovered for MCP server: {ServerName}", config.Name);
+                return;
+            }
+            else
+            {
+                logger.LogDebug("Discovered {ToolCount} tools for MCP server: {ServerName}", 
+                    tools.Count(), config.Name);
+            }
             
+            // 4.2 Log each tool's name and description
+            foreach (var tool in tools)
+            {
+                logger.LogDebug("Tool discovered - Name: {ToolName}, Description: {ToolDescription}", 
+                    tool.Name, tool.Description);
+            }
+
             // 5. Convert McpClientTool (AIFunction) to KernelFunction using the AsKernelFunction() extension
             // Note: AsKernelFunction() is experimental but officially recommended by Microsoft DevBlogs example
 #pragma warning disable SKEXP0001 // AsKernelFunction is experimental

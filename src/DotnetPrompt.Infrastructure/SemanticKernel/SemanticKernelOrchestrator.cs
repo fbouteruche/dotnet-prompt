@@ -90,6 +90,12 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             _logger.LogInformation("Executing workflow with SK Handlebars templating and automatic function calling");
             
             // 8. Execute with SK's automatic function calling and Handlebars rendering
+            // Pass execution settings via KernelArguments for proper function calling behavior
+            kernelArgs.ExecutionSettings = new Dictionary<string, PromptExecutionSettings>
+            {
+                { PromptExecutionSettings.DefaultServiceId, executionSettings }
+            };
+            
             var result = await workflowFunction.InvokeAsync(_kernel, kernelArgs, cancellationToken);
 
             // 9. Save conversation state for resume
@@ -317,6 +323,12 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             _logger.LogInformation("Resuming workflow execution with restored state");
             
             // 10. Execute with SK's automatic function calling and Handlebars rendering
+            // Pass execution settings via KernelArguments for proper function calling behavior
+            kernelArgs.ExecutionSettings = new Dictionary<string, PromptExecutionSettings>
+            {
+                { PromptExecutionSettings.DefaultServiceId, executionSettings }
+            };
+            
             var result = await workflowFunction.InvokeAsync(_kernel, kernelArgs, cancellationToken);
 
             // 11. Save conversation state and progress
