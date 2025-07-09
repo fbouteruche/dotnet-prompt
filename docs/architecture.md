@@ -451,6 +451,9 @@ public class FileProgressManager : IProgressManager
 - **Microsoft.Extensions.AI.Abstractions** - Core interfaces for AI services
 - **C# SDK for MCP** - Native Model Context Protocol support integrated via SK plugins
 
+**API Documentation:**
+- [Microsoft Semantic Kernel API Reference](https://learn.microsoft.com/en-us/dotnet/api/microsoft.semantickernel?view=semantic-kernel-dotnet) - Complete API documentation for all SK classes, interfaces, and methods
+
 ### 6.3 Supporting Libraries
 
 - **MediatR** - CQRS/Mediator pattern for use cases

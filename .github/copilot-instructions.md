@@ -224,6 +224,9 @@ public class WorkflowExecutionFilter : IFunctionInvocationFilter
 <PackageReference Include="YamlDotNet" />
 ```
 
+### API References
+- [Microsoft Semantic Kernel API Documentation](https://learn.microsoft.com/en-us/dotnet/api/microsoft.semantickernel?view=semantic-kernel-dotnet) - Complete API reference for all Semantic Kernel classes, interfaces, and methods
+
 ### MCP Integration Guidelines
 - **Use Official MCP SDK**: Always use the official `ModelContextProtocol` NuGet package
 - **API Reference**: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.html
