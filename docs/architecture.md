@@ -591,9 +591,130 @@ public class FileProgressManager : IProgressManager
 - Progress persistence for long-running operations
 - Graceful degradation when services are unavailable
 
-## 13. Microsoft AI Ecosystem Integration Benefits
+## 13. CLI Output Patterns & User Experience Design
 
-### 13.1 Microsoft.Extensions.AI Advantages
+### 13.1 Hybrid Logging Architecture (Industry Standard)
+
+The CLI tool implements a **dual-output pattern** that separates user-facing communication from operational telemetry:
+
+```csharp
+// ✅ User-Facing Output (Console.WriteLine/Error.WriteLine)
+Console.WriteLine("✓ Configuration is valid");
+Console.Error.WriteLine("Error: Workflow file not found");
+
+// ✅ Structured Logging (ILogger) 
+_logger.LogInformation("Workflow completed successfully in {ExecutionTime}", result.ExecutionTime);
+_logger.LogError("Workflow execution failed: {ErrorMessage}", result.ErrorMessage);
+```
+
+### 13.2 CLI Output Design Principles
+
+**User-Facing Output Responsibilities:**
+- **Primary user interface** - Direct communication with CLI users
+- **Machine parseable** - Scripts and automation can capture and process output
+- **Immediate feedback** - Appears instantly without formatting overhead
+- **Exit code correlation** - Error messages directly correlate with exit codes
+- **Pipeline compatible** - Works correctly with stdout/stderr redirection
+
+**Structured Logging Responsibilities:**
+- **Operational observability** - Debugging, monitoring, troubleshooting
+- **Structured data** - Correlation IDs, timing, context enrichment
+- **Configurable output** - Can be redirected to files, external sinks
+- **Development insights** - Verbose mode, detailed execution traces
+- **Telemetry integration** - Performance metrics and error analytics
+
+### 13.3 Command Implementation Pattern
+
+```csharp
+public async Task<int> ExecuteAsync(RunOptions options)
+{
+    try
+    {
+        // Structured logging for operations
+        _logger.LogInformation("Executing workflow: {WorkflowFile}", options.WorkflowFile);
+        
+        var result = await _workflowService.ExecuteAsync(options.WorkflowFile, executionOptions);
+        
+        if (result.Success)
+        {
+            // User-facing success output
+            if (!string.IsNullOrEmpty(result.Output))
+            {
+                Console.WriteLine(result.Output);  // ✅ User sees this
+            }
+            
+            // Structured logging for telemetry
+            _logger.LogInformation("Workflow completed successfully in {ExecutionTime}", result.ExecutionTime);
+            return ExitCodes.Success;
+        }
+        else
+        {
+            // User-facing error output
+            Console.Error.WriteLine($"Error: {result.ErrorMessage}");  // ✅ User sees this
+            
+            // Structured logging for debugging
+            _logger.LogError("Workflow execution failed: {ErrorMessage}", result.ErrorMessage);
+            return ExitCodes.GeneralError;
+        }
+    }
+    catch (FileNotFoundException ex)
+    {
+        // User-facing error
+        Console.Error.WriteLine($"Error: Workflow file not found - {ex.Message}");  // ✅ User sees this
+        
+        // Structured logging
+        _logger.LogError(ex, "Workflow file not found");  // ✅ Ops team sees this
+        return ExitCodes.GeneralError;
+    }
+}
+```
+
+### 13.4 Verbose Mode Integration
+
+```csharp
+if (options.Verbose)
+{
+    // Show both user output AND structured logs
+    Console.WriteLine("Executing workflow with options:");
+    Console.WriteLine($"  Context: {executionOptions.Context}");
+    
+    // Structured logging provides additional detail
+    _logger.LogDebug("Options: {@Options}", options);
+}
+```
+
+### 13.5 Configuration-Driven Logging
+
+The `LoggingConfiguration` model supports both output patterns:
+
+```csharp
+public class LoggingConfiguration
+{
+    public string? Level { get; set; }
+    public bool? Console { get; set; }  // ✅ Controls ILogger console output
+    public bool? Structured { get; set; }
+    public bool? IncludeScopes { get; set; }
+}
+```
+
+### 13.6 Industry Examples & Rationale
+
+**Why Hybrid Approach (Not ILogger-Only):**
+
+1. **Performance** - Direct console output has no formatting/enrichment overhead
+2. **Reliability** - Users don't need to configure console sinks properly
+3. **UX Consistency** - Output format matches CLI conventions (not log format)
+4. **Pipeline Compatibility** - stdout/stderr redirection works correctly
+5. **Testing Simplicity** - Easier to assert on user-visible output
+
+**Successful CLI Tools Using This Pattern:**
+- **Azure CLI**: User output to stdout, debug logging configurable
+- **Docker CLI**: Command results to stdout, --log-level controls structured logs
+- **Git**: User output to stdout/stderr, GIT_TRACE enables detailed logging
+
+## 14. Microsoft AI Ecosystem Integration Benefits
+
+### 14.1 Microsoft.Extensions.AI Advantages
 
 **Unified Provider Interface**: 
 - Eliminates custom provider abstraction code
@@ -611,7 +732,7 @@ public class FileProgressManager : IProgressManager
 - Configuration through .NET's Options pattern
 - Dependency injection integration
 
-### 13.2 Semantic Kernel Benefits (Comprehensive Utilization)
+### 14.2 Semantic Kernel Benefits (Comprehensive Utilization)
 
 **AI Orchestration & Planning**:
 - Native function calling with automatic planning eliminates custom orchestration code

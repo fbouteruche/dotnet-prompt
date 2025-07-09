@@ -103,6 +103,7 @@ public class ResumeCommand : Command
         {
             if (_progressManager == null)
             {
+                Console.Error.WriteLine("Progress manager is not available - resume functionality is disabled");
                 _logger.LogWarning("Progress manager is not available - resume functionality is disabled");
                 return ExitCodes.FeatureNotAvailable;
             }
@@ -148,6 +149,7 @@ public class ResumeCommand : Command
             // Validate workflow file exists
             if (!File.Exists(workflowFile))
             {
+                Console.Error.WriteLine($"Workflow file not found: {workflowFile}");
                 _logger.LogError("Workflow file not found: {WorkflowFile}", workflowFile);
                 return ExitCodes.FileNotFound;
             }
@@ -160,6 +162,7 @@ public class ResumeCommand : Command
 
                 if (!states.Any())
                 {
+                    Console.Error.WriteLine("No resumable workflow states found. Start a new workflow execution instead.");
                     _logger.LogWarning("No resumable workflow states found. Start a new workflow execution instead.");
                     return ExitCodes.NoProgressFound;
                 }
@@ -171,6 +174,7 @@ public class ResumeCommand : Command
                 }
                 else
                 {
+                    Console.Error.WriteLine("Multiple resumable states found. Please specify --workflow-id:");
                     _logger.LogWarning("Multiple resumable states found. Please specify --workflow-id:");
                     foreach (var state in states)
                     {
@@ -194,6 +198,8 @@ public class ResumeCommand : Command
                 var isCompatible = await _progressManager.ValidateWorkflowCompatibilityAsync(workflowId, workflowContent);
                 if (!isCompatible)
                 {
+                    Console.Error.WriteLine("Workflow has changed significantly since last execution and may not be compatible for resume.");
+                    Console.Error.WriteLine("Use --force to attempt resume anyway, or start a new workflow execution.");
                     _logger.LogError("Workflow has changed significantly since last execution and may not be compatible for resume.");
                     _logger.LogError("Use --force to attempt resume anyway, or start a new workflow execution.");
                     return ExitCodes.WorkflowValidationError;
@@ -228,6 +234,7 @@ public class ResumeCommand : Command
             }
             else
             {
+                Console.Error.WriteLine($"Workflow resume failed: {result.ErrorMessage}");
                 _logger.LogError("Workflow resume failed: {ErrorMessage}", result.ErrorMessage);
                 return ExitCodes.WorkflowExecutionFailed;
             }

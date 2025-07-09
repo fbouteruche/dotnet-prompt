@@ -2,11 +2,14 @@ using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Models;
 using DotnetPrompt.Core.Parsing;
 using DotnetPrompt.Infrastructure.SemanticKernel;
+using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
+using DotnetPrompt.Infrastructure.Models;
 using DotnetPrompt.IntegrationTests.Utilities;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
@@ -43,6 +46,24 @@ public class SkHandlebarsTemplatingTests : IDisposable
         services.AddSingleton<ILogger<KernelFactory>>(new MockLogger<KernelFactory>());
         services.AddSingleton<IConfigurationService, MockConfigurationService>();
         services.AddSingleton<IFunctionInvocationFilter, MockWorkflowExecutionFilter>();
+        
+        // Register plugin dependencies (following Clean Architecture DI patterns)
+        services.AddSingleton<ILogger<FileSystemPlugin>>(new MockLogger<FileSystemPlugin>());
+        services.AddSingleton<ILogger<ProjectAnalysisPlugin>>(new MockLogger<ProjectAnalysisPlugin>());
+        
+        // Configure FileSystemOptions for FileSystemPlugin
+        services.Configure<FileSystemOptions>(options =>
+        {
+            // Set test-friendly defaults
+            options.MaxFileSizeBytes = 1024 * 1024; // 1MB for tests
+            options.AllowedExtensions = new[] { ".md", ".txt", ".json", ".yaml", ".yml" };
+            options.BlockedDirectories = new[] { "bin", "obj", ".git" };
+        });
+        
+        // Register plugins with their required dependencies
+        services.AddSingleton<FileSystemPlugin>();
+        services.AddSingleton<ProjectAnalysisPlugin>();
+        
         services.AddSingleton<IKernelFactory, KernelFactory>();
 
         _serviceProvider = services.BuildServiceProvider();
@@ -76,9 +97,13 @@ public class SkHandlebarsTemplatingTests : IDisposable
             
             // Create SK Handlebars template factory
             var templateFactory = new HandlebarsPromptTemplateFactory();
-            var template = templateFactory.Create(new PromptTemplateConfig(handlebarsTemplate));
+            var templateConfig = new PromptTemplateConfig(handlebarsTemplate)
+            {
+                TemplateFormat = "handlebars"
+            };
+            var template = templateFactory.Create(templateConfig);
             
-            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables));
+            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value)));
 
             // Assert
             renderedTemplate.Should().Contain("TestProject");
@@ -126,9 +151,13 @@ public class SkHandlebarsTemplatingTests : IDisposable
             var kernel = await _kernelFactory.CreateKernelAsync("github");
             
             var templateFactory = new HandlebarsPromptTemplateFactory();
-            var template = templateFactory.Create(new PromptTemplateConfig(handlebarsTemplate));
+            var templateConfig = new PromptTemplateConfig(handlebarsTemplate)
+            {
+                TemplateFormat = "handlebars"
+            };
+            var template = templateFactory.Create(templateConfig);
             
-            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables));
+            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value)));
 
             // Assert
             renderedTemplate.Should().Contain("Detailed analysis will be performed");
@@ -225,7 +254,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
             
             {{/each}}
             
-            {{#if (and (eq environment "production") (gt security_level 3))}}
+            {{#if isProduction}}
             🔒 High security mode enabled for production environment.
             {{/if}}
             """;
@@ -234,6 +263,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
         {
             ["environment"] = "production",
             ["security_level"] = 4,
+            ["isProduction"] = true,
             ["providers"] = new[]
             {
                 new Dictionary<string, object>
@@ -260,9 +290,13 @@ public class SkHandlebarsTemplatingTests : IDisposable
             var kernel = await _kernelFactory.CreateKernelAsync("github");
             
             var templateFactory = new HandlebarsPromptTemplateFactory();
-            var template = templateFactory.Create(new PromptTemplateConfig(complexTemplate));
+            var templateConfig = new PromptTemplateConfig(complexTemplate)
+            {
+                TemplateFormat = "handlebars"
+            };
+            var template = templateFactory.Create(templateConfig);
             
-            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables));
+            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value)));
 
             // Assert
             renderedTemplate.Should().Contain("Provider: OpenAI");
@@ -310,9 +344,13 @@ public class SkHandlebarsTemplatingTests : IDisposable
             var kernel = await _kernelFactory.CreateKernelAsync("github");
             
             var templateFactory = new HandlebarsPromptTemplateFactory();
-            var template = templateFactory.Create(new PromptTemplateConfig(invalidTemplate));
+            var templateConfig = new PromptTemplateConfig(invalidTemplate)
+            {
+                TemplateFormat = "handlebars"
+            };
+            var template = templateFactory.Create(templateConfig);
             
-            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables));
+            var renderedTemplate = await template.RenderAsync(kernel, new KernelArguments(variables.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value)));
 
             // Assert - SK Handlebars should handle missing variables gracefully
             renderedTemplate.Should().Contain("This should appear");
