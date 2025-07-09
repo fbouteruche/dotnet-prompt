@@ -1,5 +1,6 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Models;
+using DotnetPrompt.Infrastructure.Mcp;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,16 @@ public interface IKernelFactory
     /// <param name="configuration">Provider-specific configuration</param>
     /// <returns>Configured Kernel instance with specified plugins</returns>
     Task<Kernel> CreateKernelWithPluginsAsync(Type[] pluginTypes, string? providerName = null, Dictionary<string, object>? configuration = null);
+
+    /// <summary>
+    /// Creates a Kernel with specific plugins and MCP servers from workflow
+    /// </summary>
+    /// <param name="workflow">Workflow containing MCP configuration</param>
+    /// <param name="pluginTypes">Types of plugins to register</param>
+    /// <param name="providerName">AI provider name</param>
+    /// <param name="configuration">Provider-specific configuration</param>
+    /// <returns>Configured Kernel instance with specified plugins and MCP servers</returns>
+    Task<Kernel> CreateKernelWithWorkflowAsync(DotpromptWorkflow? workflow = null, Type[]? pluginTypes = null, string? providerName = null, Dictionary<string, object>? configuration = null);
 }
 
 /// <summary>
@@ -51,19 +62,15 @@ public class KernelFactory : IKernelFactory
 
     public async Task<Kernel> CreateKernelAsync(string? providerName = null, Dictionary<string, object>? configuration = null)
     {
-        // Add all built-in workflow plugins by default (excluding SubWorkflowPlugin temporarily for test simplification)
-        var pluginTypes = new[]
-        {
-            typeof(Plugins.FileSystemPlugin),
-            typeof(Plugins.ProjectAnalysisPlugin)
-            // TODO: Re-enable SubWorkflowPlugin when its dependencies are properly registered in tests
-            // typeof(Plugins.SubWorkflowPlugin)
-        };
-
-        return await CreateKernelWithPluginsAsync(pluginTypes, providerName, configuration);
+        return await CreateKernelWithWorkflowAsync(null, null, providerName, configuration);
     }
 
     public async Task<Kernel> CreateKernelWithPluginsAsync(Type[] pluginTypes, string? providerName = null, Dictionary<string, object>? configuration = null)
+    {
+        return await CreateKernelWithWorkflowAsync(null, pluginTypes, providerName, configuration);
+    }
+
+    public async Task<Kernel> CreateKernelWithWorkflowAsync(DotpromptWorkflow? workflow = null, Type[]? pluginTypes = null, string? providerName = null, Dictionary<string, object>? configuration = null)
     {
         var builder = Kernel.CreateBuilder();
 
@@ -77,11 +84,26 @@ public class KernelFactory : IKernelFactory
         var workflowFilter = _serviceProvider.GetRequiredService<IFunctionInvocationFilter>();
         builder.Services.AddSingleton(workflowFilter);
 
+        // Add MCP execution filter
+        var mcpFilter = _serviceProvider.GetService<McpExecutionFilter>();
+        if (mcpFilter != null)
+        {
+            builder.Services.AddSingleton<IFunctionInvocationFilter>(mcpFilter);
+        }
+
         // Build the kernel
         var kernel = builder.Build();
 
-        // Register plugins with proper SK function annotations
-        foreach (var pluginType in pluginTypes)
+        // Register built-in plugins
+        var defaultPluginTypes = pluginTypes ?? new[]
+        {
+            typeof(Plugins.FileSystemPlugin),
+            typeof(Plugins.ProjectAnalysisPlugin)
+            // TODO: Re-enable SubWorkflowPlugin when its dependencies are properly registered in tests
+            // typeof(Plugins.SubWorkflowPlugin)
+        };
+
+        foreach (var pluginType in defaultPluginTypes)
         {
             var plugin = _serviceProvider.GetRequiredService(pluginType);
             var pluginName = pluginType.Name.Replace("Plugin", "");
@@ -90,8 +112,22 @@ public class KernelFactory : IKernelFactory
             _logger.LogDebug("Registered SK plugin: {PluginName} from {PluginType}", pluginName, pluginType.Name);
         }
 
+        // Add MCP servers if specified in workflow
+        if (workflow != null)
+        {
+            try
+            {
+                await kernel.AddMcpServersFromWorkflowAsync(workflow, _serviceProvider);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register MCP servers from workflow, continuing without MCP integration");
+                // Continue without MCP rather than failing the entire kernel creation
+            }
+        }
+
         _logger.LogInformation("Created Kernel with {PluginCount} plugins for provider {Provider}", 
-            pluginTypes.Length, providerName ?? "default");
+            defaultPluginTypes.Length, providerName ?? "default");
 
         return kernel;
     }
