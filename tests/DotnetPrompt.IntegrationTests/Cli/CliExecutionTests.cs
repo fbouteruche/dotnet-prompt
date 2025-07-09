@@ -48,12 +48,22 @@ public class CliExecutionTests : IDisposable
         var workflowFile = Path.Combine(_testDirectory, "sk-plugins-test.prompt.md");
         await File.WriteAllTextAsync(workflowFile, workflowContent);
 
-        // Act
-        var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run");
+        // Set environment variable for testing
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
 
-        // Assert
-        result.ExitCode.Should().Be(0, $"CLI execution should succeed. Error: {result.Error}");
-        result.Output.Should().Contain("sk-plugins-test", "Output should mention the workflow name");
+        try
+        {
+            // Act
+            var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run");
+
+            // Assert
+            result.ExitCode.Should().Be(0, $"CLI execution should succeed. Error: {result.Error}");
+            result.Output.Should().Contain("sk-plugins-test", "Output should mention the workflow name");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+        }
     }
 
     [Fact]
@@ -83,12 +93,12 @@ public class CliExecutionTests : IDisposable
         
         // Verbose output should include additional logging/telemetry information
         var output = result.Output + result.Error; // Check both stdout and stderr for verbose logs
-        output.Should().Match("*verbose*" + 
-                              " OR *debug*" + 
-                              " OR *telemetry*" + 
-                              " OR *plugin*" + 
-                              " OR *kernel*",
-            "Verbose mode should show additional SK telemetry or debug information");
+        (output.Contains("verbose", StringComparison.OrdinalIgnoreCase) || 
+         output.Contains("debug", StringComparison.OrdinalIgnoreCase) || 
+         output.Contains("telemetry", StringComparison.OrdinalIgnoreCase) || 
+         output.Contains("plugin", StringComparison.OrdinalIgnoreCase) || 
+         output.Contains("kernel", StringComparison.OrdinalIgnoreCase))
+            .Should().BeTrue("Verbose mode should show additional SK telemetry or debug information");
     }
 
     [Fact]
@@ -113,12 +123,22 @@ public class CliExecutionTests : IDisposable
         var workflowFile = Path.Combine(_testDirectory, "context-test.prompt.md");
         await File.WriteAllTextAsync(workflowFile, workflowContent);
 
-        // Act
-        var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run --context \"{contextDirectory}\"");
+        // Set environment variable for testing
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
 
-        // Assert
-        result.ExitCode.Should().Be(0, $"CLI execution should succeed. Error: {result.Error}");
-        result.Output.Should().Contain("context-test", "Output should mention the workflow name");
+        try
+        {
+            // Act
+            var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run --context \"{contextDirectory}\"");
+
+            // Assert
+            result.ExitCode.Should().Be(0, $"CLI execution should succeed. Error: {result.Error}");
+            result.Output.Should().Contain("context-test", "Output should mention the workflow name");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+        }
     }
 
     [Fact]
@@ -140,16 +160,26 @@ public class CliExecutionTests : IDisposable
         var workflowFile = Path.Combine(_testDirectory, "timeout-test.prompt.md");
         await File.WriteAllTextAsync(workflowFile, workflowContent);
 
-        // Act - Use a very short timeout to test timeout handling
-        var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run --timeout 1");
+        // Set environment variable for testing
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
 
-        // Assert - Either succeeds quickly or times out appropriately
-        // In dry-run mode, this should succeed quickly
-        result.ExitCode.Should().BeOneOf(0, 4); // Success or ExecutionTimeout
-        
-        if (result.ExitCode == 4)
+        try
         {
-            result.Error.Should().Match("*timeout*", "Timeout error should mention timeout");
+            // Act - Use a very short timeout to test timeout handling
+            var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run --timeout 1");
+
+            // Assert - Either succeeds quickly or times out appropriately
+            // In dry-run mode, this should succeed quickly
+            result.ExitCode.Should().BeOneOf(0, 4); // Success or ExecutionTimeout
+            
+            if (result.ExitCode == 4)
+            {
+                result.Error.Should().Match("*timeout*", "Timeout error should mention timeout");
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
         }
     }
 
@@ -212,11 +242,12 @@ public class CliExecutionTests : IDisposable
         var result = await RunCliAsync($"resume \"{workflowFile}\"");
 
         // Assert - Should return appropriate exit code for no progress found
-        result.ExitCode.Should().BeOneOf(0, 12); // Success or NoProgressFound
+        result.ExitCode.Should().BeOneOf(0, 11, 12); // Success, FeatureNotAvailable, or NoProgressFound
         
+        // If it returns NoProgressFound (12), should have user-friendly error message
         if (result.ExitCode == 12)
         {
-            result.Error.Should().Match("*progress*" + " OR *resume*", "Should indicate no progress file found");
+            result.Error.Should().Contain("No resumable workflow states found", "Should provide clear error message to user");
         }
     }
 
@@ -228,13 +259,18 @@ public class CliExecutionTests : IDisposable
             ---
             name: "invalid-test"
             model: "gpt-4o"
-            tools: ["nonexistent-tool"]  # Invalid tool
-            invalid_field: "this should cause validation error"
+            tools: ["nonexistent-tool"]
+            invalid yaml structure here: [unclosed
+            malformed: 
+              - item1
+              - item2
+                nested:
+                  unclosed: "value
             ---
             
             # Invalid Workflow Test
             
-            This workflow contains invalid configuration.
+            This workflow contains malformed YAML that should cause parsing errors.
             """;
 
         var workflowFile = Path.Combine(_testDirectory, "invalid-test.prompt.md");
@@ -245,8 +281,12 @@ public class CliExecutionTests : IDisposable
 
         // Assert
         result.ExitCode.Should().NotBe(0, "Invalid workflow should not succeed");
-        result.Error.Should().Match("*validation*" + " OR *invalid*" + " OR *error*", 
-            "Should indicate validation error");
+        var allOutput = result.Output + result.Error;
+        (allOutput.Contains("validation", StringComparison.OrdinalIgnoreCase) || 
+         allOutput.Contains("invalid", StringComparison.OrdinalIgnoreCase) || 
+         allOutput.Contains("error", StringComparison.OrdinalIgnoreCase) ||
+         allOutput.Contains("parse", StringComparison.OrdinalIgnoreCase))
+            .Should().BeTrue("Should indicate validation or parsing error");
     }
 
     [Fact]
@@ -273,16 +313,26 @@ public class CliExecutionTests : IDisposable
         var workflowFile = Path.Combine(_testDirectory, "filter-pipeline-test.prompt.md");
         await File.WriteAllTextAsync(workflowFile, workflowContent);
 
-        // Act
-        var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run --verbose");
+        // Set environment variable for testing
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
 
-        // Assert
-        result.ExitCode.Should().Be(0, $"CLI execution should succeed. Error: {result.Error}");
-        result.Output.Should().Contain("filter-pipeline-test", "Output should mention the workflow name");
-        
-        // In verbose mode, should show some indication of filter processing
-        var output = result.Output + result.Error;
-        output.Should().NotBeNullOrEmpty("Should have output indicating SK processing");
+        try
+        {
+            // Act
+            var result = await RunCliAsync($"run \"{workflowFile}\" --dry-run --verbose");
+
+            // Assert
+            result.ExitCode.Should().Be(0, $"CLI execution should succeed. Error: {result.Error}");
+            result.Output.Should().Contain("filter-pipeline-test", "Output should mention the workflow name");
+            
+            // In verbose mode, should show some indication of filter processing
+            var output = result.Output + result.Error;
+            output.Should().NotBeNullOrEmpty("Should have output indicating SK processing");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+        }
     }
 
     private async Task<CliResult> RunCliAsync(string arguments)

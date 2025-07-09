@@ -73,9 +73,9 @@ public class FileBasedProgressTests : IDisposable
         var jsonDocument = JsonDocument.Parse(jsonContent);
         var root = jsonDocument.RootElement;
 
-        root.TryGetProperty("workflowMetadata", out var metadata).Should().BeTrue();
-        root.TryGetProperty("executionContext", out var executionContext).Should().BeTrue();
-        root.TryGetProperty("chatHistory", out var chatHistoryArray).Should().BeTrue();
+        root.TryGetProperty("workflow_metadata", out var metadata).Should().BeTrue();
+        root.TryGetProperty("execution_context", out var executionContext).Should().BeTrue();
+        root.TryGetProperty("chat_history", out var chatHistoryArray).Should().BeTrue();
         
         chatHistoryArray.GetArrayLength().Should().Be(3, "Should have 3 chat messages");
     }

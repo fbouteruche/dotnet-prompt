@@ -123,6 +123,7 @@ public class FileProgressManager : IProgressManager
                 {
                     "user" => AuthorRole.User,
                     "assistant" => AuthorRole.Assistant,
+                    "system" => AuthorRole.System,
                     "tool" => AuthorRole.Tool,
                     _ => AuthorRole.Assistant
                 };

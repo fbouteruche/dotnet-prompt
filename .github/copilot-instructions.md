@@ -27,6 +27,83 @@ CLI Layer (DotnetPrompt.Cli)
 - Inject `IKernel`, `IChatCompletionService`, and SK abstractions
 - Use configuration pattern with `IOptions<T>` for settings
 
+## CLI Output Patterns
+
+### Hybrid Logging Architecture (Industry Standard)
+
+The CLI tool implements a **dual-output pattern** that separates user-facing communication from operational telemetry:
+
+```csharp
+// ✅ User-Facing Output (Console.WriteLine/Error.WriteLine)
+Console.WriteLine("✓ Configuration is valid");
+Console.Error.WriteLine("Error: Workflow file not found");
+
+// ✅ Structured Logging (ILogger) 
+_logger.LogInformation("Workflow completed successfully in {ExecutionTime}", result.ExecutionTime);
+_logger.LogError("Workflow execution failed: {ErrorMessage}", result.ErrorMessage);
+```
+
+### CLI Output Design Principles
+
+**User-Facing Output (Console.WriteLine/Error.WriteLine):**
+- **Primary user interface** - Direct communication with CLI users
+- **Machine parseable** - Scripts and automation can capture and process output
+- **Immediate feedback** - Appears instantly without formatting overhead
+- **Exit code correlation** - Error messages directly correlate with exit codes
+- **Pipeline compatible** - Works correctly with stdout/stderr redirection
+
+**Structured Logging (ILogger):**
+- **Operational observability** - Debugging, monitoring, troubleshooting
+- **Structured data** - Correlation IDs, timing, context enrichment
+- **Configurable output** - Can be redirected to files, external sinks
+- **Development insights** - Verbose mode, detailed execution traces
+
+### Command Implementation Pattern
+
+```csharp
+public async Task<int> ExecuteAsync(RunOptions options)
+{
+    try
+    {
+        // Structured logging for operations
+        _logger.LogInformation("Executing workflow: {WorkflowFile}", options.WorkflowFile);
+        
+        var result = await _workflowService.ExecuteAsync(options.WorkflowFile, executionOptions);
+        
+        if (result.Success)
+        {
+            // User-facing success output
+            if (!string.IsNullOrEmpty(result.Output))
+            {
+                Console.WriteLine(result.Output);  // ✅ User sees this
+            }
+            
+            // Structured logging for telemetry
+            _logger.LogInformation("Workflow completed successfully in {ExecutionTime}", result.ExecutionTime);
+            return ExitCodes.Success;
+        }
+        else
+        {
+            // User-facing error output
+            Console.Error.WriteLine($"Error: {result.ErrorMessage}");  // ✅ User sees this
+            
+            // Structured logging for debugging
+            _logger.LogError("Workflow execution failed: {ErrorMessage}", result.ErrorMessage);
+            return ExitCodes.GeneralError;
+        }
+    }
+    catch (FileNotFoundException ex)
+    {
+        // User-facing error
+        Console.Error.WriteLine($"Error: Workflow file not found - {ex.Message}");  // ✅ User sees this
+        
+        // Structured logging
+        _logger.LogError(ex, "Workflow file not found");  // ✅ Ops team sees this
+        return ExitCodes.GeneralError;
+    }
+}
+```
+
 ## Code Generation Guidelines
 
 ### Semantic Kernel Integration
