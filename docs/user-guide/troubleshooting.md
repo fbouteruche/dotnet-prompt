@@ -627,3 +627,11 @@ Contact information and support tiers available in the main repository documenta
 4. **Error Alerting**: Set up alerts for workflow failures
 
 This troubleshooting guide covers the most common issues and provides systematic approaches to diagnosing and resolving problems with dotnet-prompt workflows.
+
+## Related Documentation
+
+- **[Installation Guide](./installation.md)**: Platform-specific installation instructions and setup troubleshooting
+- **[Getting Started](./getting-started.md)**: Basic workflow creation and execution
+- **[MCP Integration](./mcp-integration.md)**: External tool setup and configuration
+- **[Configuration Reference](../reference/configuration-options.md)**: Complete configuration documentation
+- **[CLI Commands](../reference/cli-commands.md)**: Detailed command reference and options

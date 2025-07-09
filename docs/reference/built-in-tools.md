@@ -678,7 +678,8 @@ dotnet prompt config show
 
 ## Next Steps
 
-- **[MCP Servers](./mcp-servers.md)**: Extend capabilities with external tools
+- **[Installation Guide](../user-guide/installation.md)**: Setup and MCP server installation
+- **[MCP Integration](../user-guide/mcp-integration.md)**: Using external tools and services
 - **[Configuration Options](./configuration-options.md)**: Customize tool behavior
-- **[Error Codes](./error-codes.md)**: Tool-specific error codes
+- **[CLI Commands](./cli-commands.md)**: Tool-related command options
 - **[Advanced Workflows](../user-guide/advanced-workflows.md)**: Complex tool usage patterns

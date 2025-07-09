@@ -83,6 +83,8 @@ dotnet tool install -g dotnet-prompt
 dotnet prompt --version
 ```
 
+> **Need help installing?** See our detailed [Installation Guide](./docs/user-guide/installation.md) for platform-specific instructions and troubleshooting.
+> 
 > **New to dotnet-prompt?** Check out our comprehensive [Getting Started Guide](./docs/user-guide/getting-started.md) for a step-by-step tutorial!
 
 ### Basic Usage
@@ -527,6 +529,16 @@ Analyze the project and generate:
 
 Comprehensive documentation is available in the `/docs` directory:
 
+### User Guides
+- **[Getting Started](./docs/user-guide/getting-started.md)**: Complete setup tutorial and first workflow
+- **[Installation Guide](./docs/user-guide/installation.md)**: Platform-specific installation instructions
+- **[Basic Workflows](./docs/user-guide/basic-workflows.md)**: Simple examples for learning
+- **[Advanced Workflows](./docs/user-guide/advanced-workflows.md)**: Complex multi-step scenarios
+- **[Dotprompt Format](./docs/user-guide/dotprompt-format.md)**: Complete format specification
+- **[MCP Integration](./docs/user-guide/mcp-integration.md)**: External tool integration guide
+- **[Troubleshooting](./docs/user-guide/troubleshooting.md)**: Common issues and solutions
+
+### Technical Specifications
 - **[Product Requirements](./docs/requirements.md)**: Complete feature specification
 - **[Architecture Guide](./docs/architecture.md)**: Technical architecture details
 - **[CLI Reference](./docs/cli-interface-specification.md)**: Complete command documentation

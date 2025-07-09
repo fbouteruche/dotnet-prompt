@@ -16,7 +16,7 @@ dotnet tool install -g dotnet-prompt
 dotnet prompt --version
 ```
 
-> **Note**: Currently in development. See [Development Installation](#development-installation) for building from source.
+> **Note**: Currently in development. See our detailed [Installation Guide](./installation.md) for platform-specific instructions, or see [Development Installation](#development-installation) below for building from source.
 
 ## Your First Workflow
 
@@ -99,9 +99,11 @@ The AI will use the available tools to complete the tasks.
 
 Now that you've created your first workflow, explore these guides:
 
+- **[Installation Guide](./installation.md)**: Complete installation instructions for all platforms
 - **[Dotprompt Format](./dotprompt-format.md)**: Complete format specification
 - **[Basic Workflows](./basic-workflows.md)**: More simple examples to learn from
 - **[Built-in Tools](../reference/built-in-tools.md)**: Available tools and their capabilities
+- **[MCP Integration](./mcp-integration.md)**: Extend workflows with external tools
 - **[Configuration](../reference/configuration-options.md)**: Customizing behavior
 - **[Advanced Workflows](./advanced-workflows.md)**: Complex multi-step scenarios
 

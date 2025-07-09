@@ -638,6 +638,14 @@ dotnet prompt config restore --backup-file config-backup-20241201.json
 2. **Monitor Logs**: Review logs regularly for issues
 3. **Test Configuration Changes**: Validate changes in non-production environments
 4. **Document Custom Settings**: Document any custom configuration choices
+
+## Related Documentation
+
+- **[Installation Guide](../user-guide/installation.md)**: Initial setup and configuration
+- **[Getting Started](../user-guide/getting-started.md)**: Basic configuration for first workflows
+- **[MCP Integration](../user-guide/mcp-integration.md)**: External tool server configuration
+- **[CLI Commands](./cli-commands.md)**: Configuration-related CLI commands
+- **[Troubleshooting](../user-guide/troubleshooting.md)**: Configuration issue resolution
 5. **Backup Configuration**: Regularly backup configuration files
 
 This comprehensive configuration guide ensures optimal performance, security, and maintainability of dotnet-prompt across different environments and use cases.
