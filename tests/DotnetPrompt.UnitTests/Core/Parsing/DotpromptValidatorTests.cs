@@ -362,10 +362,11 @@ public class DotpromptValidatorTests
                 {
                     new() { Name = "analysis", Path = "./analysis.prompt.md" }
                 },
-                Progress = new ProgressConfig
+                Resume = new ResumeConfig
                 {
-                    Enabled = true,
-                    CheckpointFrequency = "after_each_tool"
+                    StorageLocation = "./.dotnet-prompt/resume",
+                    RetentionDays = 7,
+                    EnableAtomicWrites = true
                 }
             },
             Content = new WorkflowContent

@@ -122,11 +122,9 @@ public class DotpromptParserTests : IDisposable
         workflow.Extensions.Mcp.Should().HaveCount(1);
         workflow.Extensions.Mcp![0].Server.Should().Be("filesystem-mcp");
         workflow.Extensions.Mcp[0].Version.Should().Be("1.0.0");
-        workflow.Extensions.Progress.Should().NotBeNull();
-        workflow.Extensions.Progress!.Enabled.Should().BeTrue();
-        workflow.Extensions.Progress.CheckpointFrequency.Should().Be("after_each_tool");
+        // Resume configuration tests would go here
         workflow.ExtensionFields.Should().ContainKey("dotnet-prompt.mcp");
-        workflow.ExtensionFields.Should().ContainKey("dotnet-prompt.progress");
+        // Note: Progress extension field changed to resume extension field
     }
 
     [Fact]

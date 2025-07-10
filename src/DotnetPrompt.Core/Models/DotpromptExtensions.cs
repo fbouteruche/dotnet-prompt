@@ -16,9 +16,9 @@ public class DotpromptExtensions
     [JsonPropertyName("dotnet-prompt.sub-workflows")]
     public List<SubWorkflowConfig>? SubWorkflows { get; set; }
 
-    [YamlMember(Alias = "dotnet-prompt.progress")]
-    [JsonPropertyName("dotnet-prompt.progress")]
-    public ProgressConfig? Progress { get; set; }
+    [YamlMember(Alias = "dotnet-prompt.resume")]
+    [JsonPropertyName("dotnet-prompt.resume")]
+    public ResumeConfig? Resume { get; set; }
 
     [YamlMember(Alias = "dotnet-prompt.error-handling")]
     [JsonPropertyName("dotnet-prompt.error-handling")]
