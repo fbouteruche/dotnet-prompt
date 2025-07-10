@@ -1,186 +1,87 @@
 using System.ComponentModel;
-using System.Diagnostics;
-using System.Text.Json;
+using DotnetPrompt.Infrastructure.Analysis;
+using DotnetPrompt.Infrastructure.Analysis.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
 namespace DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 
 /// <summary>
-/// Semantic Kernel plugin for .NET project analysis and metadata extraction
+/// Semantic Kernel plugin for comprehensive .NET project analysis using Roslyn
+/// Replaces basic XML parsing with full Roslyn Compiler Platform integration
 /// </summary>
 public class ProjectAnalysisPlugin
 {
     private readonly ILogger<ProjectAnalysisPlugin> _logger;
+    private readonly IRoslynAnalysisService _roslynAnalysisService;
 
-    public ProjectAnalysisPlugin(ILogger<ProjectAnalysisPlugin> logger)
+    public ProjectAnalysisPlugin(
+        ILogger<ProjectAnalysisPlugin> logger,
+        IRoslynAnalysisService roslynAnalysisService)
     {
         _logger = logger;
+        _roslynAnalysisService = roslynAnalysisService;
     }
 
-    [KernelFunction("analyze_project")]
-    [Description("Analyzes a .NET project and returns comprehensive information about its structure, dependencies, and configuration")]
-    [return: Description("JSON object containing detailed project analysis results")]
+    [KernelFunction("analyze_with_roslyn")]
+    [Description("Comprehensive .NET project analysis using Roslyn for AI workflows")]
+    [return: Description("JSON object containing comprehensive project analysis results optimized for AI consumption")]
     public async Task<string> AnalyzeProjectAsync(
-        [Description("The absolute path to the project file (.csproj/.fsproj/.vbproj)")] string projectPath,
-        [Description("Include dependency analysis (default: true)")] bool includeDependencies = true,
-        [Description("Include source file analysis (default: false)")] bool includeSourceFiles = false,
-        CancellationToken cancellationToken = default)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        
-        try
-        {
-            _logger.LogInformation("Analyzing .NET project via SK function: {ProjectPath}", projectPath);
-            
-            // Validate project file
-            var validatedPath = ValidateProjectPath(projectPath);
-            
-            if (!File.Exists(validatedPath))
-            {
-                throw new FileNotFoundException($"Project file not found: {validatedPath}");
-            }
-
-            // Parse project file
-            var projectContent = await File.ReadAllTextAsync(validatedPath, cancellationToken);
-            var analysis = await AnalyzeProjectContent(validatedPath, projectContent, includeDependencies, includeSourceFiles, cancellationToken);
-            
-            var result = JsonSerializer.Serialize(analysis, new JsonSerializerOptions { WriteIndented = true });
-            
-            _logger.LogInformation("Successfully analyzed project {ProjectPath} in {Duration}ms", 
-                validatedPath, stopwatch.ElapsedMilliseconds);
-            
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error analyzing project {ProjectPath} via SK function", projectPath);
-            throw new KernelException($"Project analysis failed: {ex.Message}", ex);
-        }
-        finally
-        {
-            stopwatch.Stop();
-        }
-    }
-
-    [KernelFunction("find_project_files")]
-    [Description("Finds all .NET project files in a directory and its subdirectories")]
-    [return: Description("JSON array of project file paths with basic information")]
-    public async Task<string> FindProjectFilesAsync(
-        [Description("The directory path to search for project files")] string searchPath,
-        [Description("Whether to search subdirectories recursively (default: true)")] bool recursive = true,
-        [Description("Maximum depth to search (default: 10)")] int maxDepth = 10,
-        CancellationToken cancellationToken = default)
-    {
-        await Task.CompletedTask; // Async compliance for SK function
-        try
-        {
-            _logger.LogInformation("Finding project files via SK function in: {SearchPath}", searchPath);
-            
-            var validatedPath = ValidateDirectoryPath(searchPath);
-            
-            if (!Directory.Exists(validatedPath))
-            {
-                throw new DirectoryNotFoundException($"Directory not found: {validatedPath}");
-            }
-
-            var projectFiles = new List<object>();
-            var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            var patterns = new[] { "*.csproj", "*.fsproj", "*.vbproj" };
-
-            foreach (var pattern in patterns)
-            {
-                var files = Directory.GetFiles(validatedPath, pattern, searchOption);
-                
-                foreach (var file in files)
-                {
-                    var fileInfo = new FileInfo(file);
-                    projectFiles.Add(new
-                    {
-                        Path = file,
-                        Name = fileInfo.Name,
-                        Directory = fileInfo.DirectoryName,
-                        Size = fileInfo.Length,
-                        LastModified = fileInfo.LastWriteTime,
-                        ProjectType = DetermineProjectType(fileInfo.Extension)
-                    });
-                }
-            }
-
-            var result = JsonSerializer.Serialize(projectFiles, new JsonSerializerOptions { WriteIndented = true });
-            
-            _logger.LogInformation("Found {ProjectCount} project files in {SearchPath}", projectFiles.Count, validatedPath);
-            
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error finding project files in {SearchPath} via SK function", searchPath);
-            throw new KernelException($"Project file search failed: {ex.Message}", ex);
-        }
-    }
-
-    [KernelFunction("get_project_dependencies")]
-    [Description("Extracts and analyzes package dependencies from a .NET project file")]
-    [return: Description("JSON object containing dependency information")]
-    public async Task<string> GetProjectDependenciesAsync(
-        [Description("The absolute path to the project file")] string projectPath,
-        [Description("Include transitive dependencies (requires dotnet CLI)")] bool includeTransitive = false,
+        [Description("Path to .csproj, .sln, or source directory")] string project_path,
+        [Description("Analysis depth: Surface, Standard, Deep, Comprehensive")] string analysis_depth = "Standard",
+        [Description("Semantic analysis depth: None, Basic, Standard, Deep, Comprehensive")] string semantic_depth = "None",
+        [Description("Compilation strategy: Auto, MSBuild, Custom, Hybrid")] string compilation_strategy = "Auto",
+        [Description("Include dependency analysis")] bool include_dependencies = true,
+        [Description("Include code quality metrics")] bool include_metrics = true,
+        [Description("Include architectural pattern detection")] bool include_patterns = false,
+        [Description("Include security vulnerability scanning")] bool include_vulnerabilities = false,
+        [Description("Specific target framework to analyze")] string? target_framework = null,
+        [Description("Maximum recursion depth for references")] int max_depth = 5,
+        [Description("Exclude auto-generated code from analysis")] bool exclude_generated = true,
+        [Description("Include test projects in analysis")] bool include_tests = true,
+        [Description("MSBuild workspace timeout in milliseconds")] int msbuild_timeout = 30000,
+        [Description("Fallback to custom compilation if MSBuild fails")] bool fallback_to_custom = true,
+        [Description("Use lightweight custom compilation mode")] bool lightweight_mode = false,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("Getting project dependencies via SK function: {ProjectPath}", projectPath);
+            _logger.LogInformation("Starting Roslyn project analysis via SK function: {ProjectPath}", project_path);
             
-            var validatedPath = ValidateProjectPath(projectPath);
-            var projectContent = await File.ReadAllTextAsync(validatedPath, cancellationToken);
+            // Validate project path
+            var validatedPath = ValidateProjectPath(project_path);
             
-            var dependencies = ExtractDependenciesFromProjectFile(projectContent);
-            
-            var result = new
+            // Parse analysis options from parameters
+            var options = new AnalysisOptions
             {
-                ProjectPath = validatedPath,
-                DirectDependencies = dependencies,
-                DependencyCount = dependencies.Count,
-                AnalysisTime = DateTimeOffset.UtcNow,
-                IncludesTransitive = includeTransitive
+                AnalysisDepth = ParseAnalysisDepth(analysis_depth),
+                SemanticDepth = ParseSemanticDepth(semantic_depth),
+                CompilationStrategy = ParseCompilationStrategy(compilation_strategy),
+                IncludeDependencies = include_dependencies,
+                IncludeMetrics = include_metrics,
+                IncludePatterns = include_patterns,
+                IncludeVulnerabilities = include_vulnerabilities,
+                TargetFramework = target_framework,
+                MaxDepth = max_depth,
+                ExcludeGenerated = exclude_generated,
+                IncludeTests = include_tests,
+                MSBuildTimeout = msbuild_timeout,
+                FallbackToCustom = fallback_to_custom,
+                LightweightMode = lightweight_mode
             };
-
-            var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
             
-            _logger.LogInformation("Extracted {DependencyCount} dependencies from {ProjectPath}", 
-                dependencies.Count, validatedPath);
+            // Perform Roslyn analysis
+            var result = await _roslynAnalysisService.AnalyzeAsync(validatedPath, options, cancellationToken);
             
-            return json;
+            _logger.LogInformation("Successfully completed Roslyn analysis for {ProjectPath}", validatedPath);
+            
+            return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting project dependencies {ProjectPath} via SK function", projectPath);
-            throw new KernelException($"Dependency analysis failed: {ex.Message}", ex);
+            _logger.LogError(ex, "Error performing Roslyn analysis for {ProjectPath} via SK function", project_path);
+            throw new KernelException($"Roslyn project analysis failed: {ex.Message}", ex);
         }
-    }
-
-    private async Task<object> AnalyzeProjectContent(string projectPath, string content, bool includeDependencies, bool includeSourceFiles, CancellationToken cancellationToken)
-    {
-        var projectDirectory = Path.GetDirectoryName(projectPath) ?? string.Empty;
-        var projectName = Path.GetFileNameWithoutExtension(projectPath);
-        
-        var analysis = new
-        {
-            ProjectPath = projectPath,
-            ProjectName = projectName,
-            ProjectType = DetermineProjectType(Path.GetExtension(projectPath)),
-            Directory = projectDirectory,
-            TargetFramework = ExtractTargetFramework(content),
-            OutputType = ExtractOutputType(content),
-            Dependencies = includeDependencies ? ExtractDependenciesFromProjectFile(content) : new List<object>(),
-            Properties = ExtractProjectProperties(content),
-            SourceFiles = includeSourceFiles ? await GetSourceFiles(projectDirectory, cancellationToken) : new List<string>(),
-            AnalysisTime = DateTimeOffset.UtcNow,
-            FileSize = new FileInfo(projectPath).Length
-        };
-
-        return analysis;
     }
 
     private string ValidateProjectPath(string projectPath)
@@ -191,104 +92,58 @@ public class ProjectAnalysisPlugin
         }
 
         var resolvedPath = Path.IsPathRooted(projectPath) ? projectPath : Path.GetFullPath(projectPath);
-        var extension = Path.GetExtension(resolvedPath).ToLowerInvariant();
         
-        if (!new[] { ".csproj", ".fsproj", ".vbproj" }.Contains(extension))
+        // Check if it's a valid project file, solution file, or directory
+        if (File.Exists(resolvedPath))
         {
-            throw new ArgumentException($"Invalid project file extension: {extension}. Expected .csproj, .fsproj, or .vbproj");
+            var extension = Path.GetExtension(resolvedPath).ToLowerInvariant();
+            if (!new[] { ".csproj", ".fsproj", ".vbproj", ".sln" }.Contains(extension))
+            {
+                throw new ArgumentException($"Invalid project file extension: {extension}. Expected .csproj, .fsproj, .vbproj, or .sln");
+            }
+        }
+        else if (!Directory.Exists(resolvedPath))
+        {
+            throw new ArgumentException($"Project path does not exist: {resolvedPath}");
         }
 
         return resolvedPath;
     }
 
-    private string ValidateDirectoryPath(string directoryPath)
+    private static AnalysisDepth ParseAnalysisDepth(string depth)
     {
-        if (string.IsNullOrWhiteSpace(directoryPath))
+        return depth.ToLowerInvariant() switch
         {
-            throw new ArgumentException("Directory path cannot be null or empty", nameof(directoryPath));
-        }
-
-        return Path.IsPathRooted(directoryPath) ? directoryPath : Path.GetFullPath(directoryPath);
-    }
-
-    private static string DetermineProjectType(string extension)
-    {
-        return extension.ToLowerInvariant() switch
-        {
-            ".csproj" => "C#",
-            ".fsproj" => "F#",
-            ".vbproj" => "VB.NET",
-            _ => "Unknown"
+            "surface" => AnalysisDepth.Surface,
+            "standard" => AnalysisDepth.Standard,
+            "deep" => AnalysisDepth.Deep,
+            "comprehensive" => AnalysisDepth.Comprehensive,
+            _ => AnalysisDepth.Standard
         };
     }
 
-    private static string? ExtractTargetFramework(string projectContent)
+    private static SemanticAnalysisDepth ParseSemanticDepth(string depth)
     {
-        var match = System.Text.RegularExpressions.Regex.Match(projectContent, @"<TargetFramework[^>]*>([^<]+)</TargetFramework>");
-        return match.Success ? match.Groups[1].Value : null;
-    }
-
-    private static string? ExtractOutputType(string projectContent)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(projectContent, @"<OutputType[^>]*>([^<]+)</OutputType>");
-        return match.Success ? match.Groups[1].Value : "Library"; // Default for .NET projects
-    }
-
-    private static List<object> ExtractDependenciesFromProjectFile(string projectContent)
-    {
-        var dependencies = new List<object>();
-        var packageReferences = System.Text.RegularExpressions.Regex.Matches(
-            projectContent, 
-            @"<PackageReference\s+Include=""([^""]+)""\s+Version=""([^""]+)""[^>]*>");
-
-        foreach (System.Text.RegularExpressions.Match match in packageReferences)
+        return depth.ToLowerInvariant() switch
         {
-            dependencies.Add(new
-            {
-                Name = match.Groups[1].Value,
-                Version = match.Groups[2].Value,
-                Type = "PackageReference"
-            });
-        }
-
-        return dependencies;
+            "none" => SemanticAnalysisDepth.None,
+            "basic" => SemanticAnalysisDepth.Basic,
+            "standard" => SemanticAnalysisDepth.Standard,
+            "deep" => SemanticAnalysisDepth.Deep,
+            "comprehensive" => SemanticAnalysisDepth.Comprehensive,
+            _ => SemanticAnalysisDepth.None
+        };
     }
 
-    private static Dictionary<string, string> ExtractProjectProperties(string projectContent)
+    private static CompilationStrategy ParseCompilationStrategy(string strategy)
     {
-        var properties = new Dictionary<string, string>();
-        
-        // Extract common project properties
-        var propertyMatches = System.Text.RegularExpressions.Regex.Matches(
-            projectContent,
-            @"<(TargetFramework|OutputType|AssemblyName|RootNamespace|Nullable|ImplicitUsings)[^>]*>([^<]+)</\1>");
-
-        foreach (System.Text.RegularExpressions.Match match in propertyMatches)
+        return strategy.ToLowerInvariant() switch
         {
-            properties[match.Groups[1].Value] = match.Groups[2].Value;
-        }
-
-        return properties;
-    }
-
-    private static Task<List<string>> GetSourceFiles(string projectDirectory, CancellationToken cancellationToken)
-    {
-        var sourceFiles = new List<string>();
-        var extensions = new[] { "*.cs", "*.fs", "*.vb" };
-
-        foreach (var extension in extensions)
-        {
-            try
-            {
-                var files = Directory.GetFiles(projectDirectory, extension, SearchOption.AllDirectories);
-                sourceFiles.AddRange(files);
-            }
-            catch
-            {
-                // Ignore errors when accessing directories
-            }
-        }
-
-        return Task.FromResult(sourceFiles);
+            "auto" => CompilationStrategy.Auto,
+            "msbuild" => CompilationStrategy.MSBuild,
+            "custom" => CompilationStrategy.Custom,
+            "hybrid" => CompilationStrategy.Hybrid,
+            _ => CompilationStrategy.Auto
+        };
     }
 }

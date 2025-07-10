@@ -39,7 +39,8 @@ public class KernelFactoryTests
             Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin>>(),
             Options.Create(new FileSystemOptions()));
         var mockProjectAnalysis = new DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin(
-            Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin>>());
+            Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin>>(),
+            Mock.Of<DotnetPrompt.Infrastructure.Analysis.IRoslynAnalysisService>());
 
         _mockServiceProvider.Setup(x => x.GetService(typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin)))
             .Returns(mockFileOps);

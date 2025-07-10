@@ -1,4 +1,6 @@
 using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Infrastructure.Analysis;
+using DotnetPrompt.Infrastructure.Analysis.Compilation;
 using DotnetPrompt.Infrastructure.Configuration;
 using DotnetPrompt.Infrastructure.Extensions;
 using DotnetPrompt.Infrastructure.Filters;
@@ -151,11 +153,36 @@ public static class ServiceCollectionExtensions
         // Add comprehensive error handling and logging
         services.AddSemanticKernelErrorHandling();
         
+        // Add Roslyn analysis services for ProjectAnalysisPlugin
+        services.AddRoslynAnalysisServices();
+        
         // Register essential SK plugins (excluding WorkflowExecutorPlugin which is replaced by SK native capabilities)
         services.AddTransient<FileSystemPlugin>();
         services.AddTransient<ProjectAnalysisPlugin>();
         services.AddTransient<SubWorkflowPlugin>();
         // NOTE: WorkflowExecutorPlugin is intentionally excluded - replaced by SK Handlebars templating
+        
+        return services;
+    }
+
+    /// <summary>
+    /// Adds Roslyn analysis services for comprehensive project analysis
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <returns>The service collection for chaining</returns>
+    public static IServiceCollection AddRoslynAnalysisServices(this IServiceCollection services)
+    {
+        // Core Roslyn analysis service
+        services.AddScoped<IRoslynAnalysisService, RoslynAnalysisService>();
+        
+        // Compilation strategies
+        services.AddScoped<ICompilationStrategy, CustomCompilationStrategy>();
+        
+        // Analysis engines (to be implemented in future phases)
+        // services.AddScoped<SemanticAnalysisEngine>();
+        // services.AddScoped<MetricsAnalysisEngine>();
+        // services.AddScoped<PatternDetectionEngine>();
+        // services.AddScoped<SecurityAnalysisEngine>();
         
         return services;
     }
