@@ -19,7 +19,7 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
 {
     private readonly IKernelFactory _kernelFactory;
     private readonly IPromptTemplateFactory _handlebarsFactory;
-    private readonly IProgressManager? _progressManager;
+    private readonly IResumeStateManager? _resumeStateManager;
     private readonly ILogger<SemanticKernelOrchestrator> _logger;
     private readonly Dictionary<string, ChatHistory> _conversationStore = new();
     private Kernel? _kernel;
@@ -28,11 +28,11 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         IKernelFactory kernelFactory,
         IPromptTemplateFactory handlebarsFactory,
         ILogger<SemanticKernelOrchestrator> logger,
-        IProgressManager? progressManager = null)
+        IResumeStateManager? resumeStateManager = null)
     {
         _kernelFactory = kernelFactory;
         _handlebarsFactory = handlebarsFactory;
-        _progressManager = progressManager;
+        _resumeStateManager = resumeStateManager;
         _logger = logger;
     }
 
@@ -73,18 +73,19 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             var workflowId = GenerateWorkflowId(workflow, context);
             var chatHistory = await GetChatHistoryAsync(workflowId);
 
-            // 7. Setup progress tracking if available
-            if (_progressManager != null)
+            // 7. Setup resume state tracking if available
+            if (_resumeStateManager != null)
             {
                 // Store workflow hash for compatibility validation
                 var workflowHash = ComputeWorkflowHash(workflow.Content?.RawMarkdown ?? string.Empty);
                 context.SetVariable("workflow_id", workflowId);
                 context.SetVariable("workflow_hash", workflowHash);
                 context.SetVariable("workflow_file", workflow.Name ?? "unknown");
+                context.SetVariable("original_content", workflow.Content?.RawMarkdown ?? "");
                 
-                // Save initial progress
-                await _progressManager.SaveProgressAsync(workflowId, context, chatHistory, cancellationToken);
-                _logger.LogDebug("Initial progress saved for workflow {WorkflowId}", workflowId);
+                // Save initial resume state
+                await _resumeStateManager.SaveResumeStateAsync(workflowId, context, chatHistory, cancellationToken);
+                _logger.LogDebug("Initial resume state saved for workflow {WorkflowId}", workflowId);
             }
 
             _logger.LogInformation("Executing workflow with SK Handlebars templating and automatic function calling");
@@ -101,11 +102,11 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             // 9. Save conversation state for resume
             await SaveChatHistoryAsync(workflowId, chatHistory);
 
-            // 10. Save final progress if available
-            if (_progressManager != null)
+            // 10. Save final resume state if available
+            if (_resumeStateManager != null)
             {
-                await _progressManager.SaveProgressAsync(workflowId, context, chatHistory, cancellationToken);
-                _logger.LogDebug("Final progress saved for workflow {WorkflowId}", workflowId);
+                await _resumeStateManager.SaveResumeStateAsync(workflowId, context, chatHistory, cancellationToken);
+                _logger.LogDebug("Final resume state saved for workflow {WorkflowId}", workflowId);
             }
 
             _logger.LogInformation("SK-native workflow execution completed successfully in {Duration}ms", 
@@ -266,31 +267,32 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
         {
             _logger.LogInformation("Resuming SK-native workflow execution: {WorkflowId}", workflowId);
 
-            if (_progressManager == null)
+            if (_resumeStateManager == null)
             {
-                throw new InvalidOperationException("Progress manager is required for workflow resume functionality");
+                throw new InvalidOperationException("Resume state manager is required for workflow resume functionality");
             }
 
-            // 1. Load progress from progress manager
-            var progressData = await _progressManager.LoadProgressAsync(workflowId, cancellationToken);
-            if (progressData == null)
+            // 1. Load resume state from resume state manager
+            var resumeData = await _resumeStateManager.LoadResumeStateAsync(workflowId, cancellationToken);
+            if (resumeData == null)
             {
-                throw new InvalidOperationException($"No progress data found for workflow {workflowId}");
+                throw new InvalidOperationException($"No resume state found for workflow {workflowId}");
             }
 
-            var (restoredContext, restoredChatHistory) = progressData.Value;
+            var (restoredContext, restoredChatHistory) = resumeData.Value;
             if (restoredContext == null || restoredChatHistory == null)
             {
-                throw new InvalidOperationException($"Invalid progress data for workflow {workflowId}");
+                throw new InvalidOperationException($"Invalid resume state for workflow {workflowId}");
             }
 
             // 2. Validate workflow compatibility
             var currentWorkflowContent = workflow.Content?.RawMarkdown ?? string.Empty;
-            var isCompatible = await _progressManager.ValidateWorkflowCompatibilityAsync(workflowId, currentWorkflowContent, cancellationToken);
+            var compatibility = await _resumeStateManager.ValidateResumeCompatibilityAsync(workflowId, currentWorkflowContent, cancellationToken);
             
-            if (!isCompatible)
+            if (!compatibility.CanResume)
             {
-                throw new InvalidOperationException($"Workflow has changed significantly and may not be compatible for resume. WorkflowId: {workflowId}");
+                var warnings = string.Join(", ", compatibility.Warnings);
+                throw new InvalidOperationException($"Workflow cannot be resumed due to compatibility issues: {warnings}");
             }
 
             // 3. Get or create kernel with required plugins and MCP servers from workflow
@@ -331,9 +333,9 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             
             var result = await workflowFunction.InvokeAsync(_kernel, kernelArgs, cancellationToken);
 
-            // 11. Save conversation state and progress
+            // 11. Save conversation state and resume state
             await SaveChatHistoryAsync(workflowId, restoredChatHistory);
-            await _progressManager.SaveProgressAsync(workflowId, restoredContext, restoredChatHistory, cancellationToken);
+            await _resumeStateManager.SaveResumeStateAsync(workflowId, restoredContext, restoredChatHistory, cancellationToken);
 
             _logger.LogInformation("SK-native workflow resume completed successfully in {Duration}ms", 
                 executionStopwatch.ElapsedMilliseconds);

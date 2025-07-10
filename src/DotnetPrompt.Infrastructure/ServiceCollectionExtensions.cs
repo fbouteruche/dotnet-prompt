@@ -5,7 +5,7 @@ using DotnetPrompt.Infrastructure.Filters;
 using DotnetPrompt.Infrastructure.Mcp;
 using DotnetPrompt.Infrastructure.Middleware;
 using DotnetPrompt.Infrastructure.Models;
-using DotnetPrompt.Infrastructure.Progress;
+using DotnetPrompt.Infrastructure.Resume;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,8 +68,8 @@ public static class ServiceCollectionExtensions
         // Register file system security filter
         services.AddSingleton<IFunctionInvocationFilter, FileSystemSecurityFilter>();
 
-        // Register progress tracking filter if progress manager is available
-        services.AddSingleton<IFunctionInvocationFilter, ProgressTrackingFilter>();
+        // Register resume state tracking filter instead of progress tracking
+        services.AddSingleton<IFunctionInvocationFilter, SKTelemetryResumeStateCapture>();
 
         // Register middleware (as additional filters)
         services.AddSingleton<IFunctionInvocationFilter, RetryMiddleware>();
@@ -125,16 +125,14 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds progress tracking and resume services using file-based storage with Semantic Kernel
+    /// Adds workflow resume state tracking services using file-based storage with Semantic Kernel
     /// </summary>
     /// <param name="services">The service collection</param>
     /// <returns>The service collection for chaining</returns>
-    public static IServiceCollection AddProgressTrackingServices(this IServiceCollection services)
+    public static IServiceCollection AddResumeStateServices(this IServiceCollection services)
     {
-        // Register file-based progress manager for simple, reliable persistence
-        services.AddSingleton<IProgressManager, FileProgressManager>();
-        
-        // Progress tracking filter is already added in AddSemanticKernelErrorHandling
+        // Use the comprehensive resume system with default configuration
+        services.AddWorkflowResumeSystemWithDefaults();
         
         return services;
     }
@@ -182,7 +180,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddConfigurationServices();
         services.AddAiProviderServices();
-        services.AddProgressTrackingServices();
+        services.AddResumeStateServices();
         
         return services;
     }
