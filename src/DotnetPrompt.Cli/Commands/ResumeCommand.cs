@@ -12,17 +12,17 @@ namespace DotnetPrompt.Cli.Commands;
 public class ResumeCommand : Command
 {
     private readonly IWorkflowOrchestrator _orchestrator;
-    private readonly IProgressManager? _progressManager;
+    private readonly IResumeStateManager? _resumeStateManager;
     private readonly ILogger<ResumeCommand> _logger;
 
     public ResumeCommand(
         IWorkflowOrchestrator orchestrator, 
-        IProgressManager? progressManager,
+        IResumeStateManager? resumeStateManager,
         ILogger<ResumeCommand> logger)
-        : base("resume", "Resume a previously interrupted workflow from saved progress")
+        : base("resume", "Resume a previously interrupted workflow from saved resume state")
     {
         _orchestrator = orchestrator;
-        _progressManager = progressManager;
+        _resumeStateManager = resumeStateManager;
         _logger = logger;
 
         // Workflow file argument (required)
@@ -101,29 +101,35 @@ public class ResumeCommand : Command
     {
         try
         {
-            if (_progressManager == null)
+            if (_resumeStateManager == null)
             {
-                Console.Error.WriteLine("Progress manager is not available - resume functionality is disabled");
-                _logger.LogWarning("Progress manager is not available - resume functionality is disabled");
+                Console.Error.WriteLine("Resume state manager is not available - resume functionality is disabled");
+                _logger.LogWarning("Resume state manager is not available - resume functionality is disabled");
                 return ExitCodes.FeatureNotAvailable;
             }
 
             _logger.LogInformation("Searching for available resumable workflow states...");
             
-            var availableStates = await _progressManager.GetAvailableConversationStatesAsync();
+            var availableStates = await _resumeStateManager.ListAvailableWorkflowsAsync();
             var states = availableStates.ToList();
 
             if (!states.Any())
             {
+                Console.WriteLine("No resumable workflow states found");
                 _logger.LogInformation("No resumable workflow states found");
                 return ExitCodes.NoProgressFound;
             }
 
+            Console.WriteLine($"Found {states.Count} resumable workflow state(s):");
             _logger.LogInformation("Found {Count} resumable workflow state(s):", states.Count);
             
             foreach (var state in states)
             {
-                Console.WriteLine($"  - {state}");
+                var timeSinceLastActivity = DateTimeOffset.UtcNow - state.LastActivity;
+                Console.WriteLine($"  • {state.WorkflowFilePath} (ID: {state.WorkflowId})");
+                Console.WriteLine($"    Last activity: {timeSinceLastActivity.TotalHours:F1}h ago");
+                Console.WriteLine($"    Phase: {state.CurrentPhase} | Completed tools: {state.CompletedTools.Count(t => t.Success)}");
+                Console.WriteLine();
             }
 
             _logger.LogInformation("Use 'dotnet prompt resume <workflow-file> --workflow-id <id>' to resume a specific workflow");
@@ -140,9 +146,9 @@ public class ResumeCommand : Command
     {
         try
         {
-            if (_progressManager == null)
+            if (_resumeStateManager == null)
             {
-                _logger.LogError("Progress manager is not available - resume functionality is disabled");
+                _logger.LogError("Resume state manager is not available - resume functionality is disabled");
                 return ExitCodes.FeatureNotAvailable;
             }
 
@@ -157,7 +163,7 @@ public class ResumeCommand : Command
             // If no specific workflow ID provided, try to find resumable states
             if (string.IsNullOrEmpty(workflowId))
             {
-                var availableStates = await _progressManager.GetAvailableConversationStatesAsync();
+                var availableStates = await _resumeStateManager.ListAvailableWorkflowsAsync();
                 var states = availableStates.ToList();
 
                 if (!states.Any())
@@ -169,7 +175,7 @@ public class ResumeCommand : Command
 
                 if (states.Count == 1)
                 {
-                    workflowId = states.First();
+                    workflowId = states.First().WorkflowId;
                     _logger.LogInformation("Found single resumable state, using: {WorkflowId}", workflowId);
                 }
                 else
@@ -178,7 +184,7 @@ public class ResumeCommand : Command
                     _logger.LogWarning("Multiple resumable states found. Please specify --workflow-id:");
                     foreach (var state in states)
                     {
-                        Console.WriteLine($"  - {state}");
+                        Console.WriteLine($"  - {state.WorkflowId} ({state.WorkflowFilePath})");
                     }
                     return ExitCodes.AmbiguousInput;
                 }
@@ -195,14 +201,26 @@ public class ResumeCommand : Command
             // Validate workflow compatibility unless forced
             if (!force)
             {
-                var isCompatible = await _progressManager.ValidateWorkflowCompatibilityAsync(workflowId, workflowContent);
-                if (!isCompatible)
+                var compatibility = await _resumeStateManager.ValidateResumeCompatibilityAsync(workflowId, workflowContent);
+                if (!compatibility.CanResume)
                 {
-                    Console.Error.WriteLine("Workflow has changed significantly since last execution and may not be compatible for resume.");
+                    Console.Error.WriteLine("Workflow cannot be resumed due to compatibility issues:");
+                    foreach (var warning in compatibility.Warnings)
+                    {
+                        Console.Error.WriteLine($"  • {warning}");
+                    }
                     Console.Error.WriteLine("Use --force to attempt resume anyway, or start a new workflow execution.");
-                    _logger.LogError("Workflow has changed significantly since last execution and may not be compatible for resume.");
-                    _logger.LogError("Use --force to attempt resume anyway, or start a new workflow execution.");
+                    _logger.LogError("Workflow cannot be resumed due to compatibility issues: {Warnings}", 
+                        string.Join(", ", compatibility.Warnings));
                     return ExitCodes.WorkflowValidationError;
+                }
+                else if (compatibility.Warnings.Any())
+                {
+                    Console.WriteLine("Resume compatibility warnings:");
+                    foreach (var warning in compatibility.Warnings)
+                    {
+                        Console.WriteLine($"  ⚠ {warning}");
+                    }
                 }
             }
 
