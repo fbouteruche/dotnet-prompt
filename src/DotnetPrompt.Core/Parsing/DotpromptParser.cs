@@ -229,8 +229,8 @@ public class DotpromptParser : IDotpromptParser
                 case "dotnet-prompt.sub-workflows":
                     workflow.Extensions.SubWorkflows = DeserializeObject<List<SubWorkflowConfig>>(field.Value);
                     break;
-                case "dotnet-prompt.progress":
-                    workflow.Extensions.Progress = DeserializeObject<ProgressConfig>(field.Value);
+                case "dotnet-prompt.resume":
+                    workflow.Extensions.Resume = DeserializeObject<ResumeConfig>(field.Value);
                     break;
                 case "dotnet-prompt.error-handling":
                     workflow.Extensions.ErrorHandling = DeserializeObject<ErrorHandlingConfig>(field.Value);
