@@ -43,7 +43,7 @@ public class FileProgressManager : IProgressManager
             var progressFile = Path.Combine(_progressDirectory, $"{workflowId}.json");
 
             // Convert ChatHistory to file format
-            var chatMessages = chatHistory.Select(msg => new ChatMessage
+            var chatMessages = chatHistory.Select(msg => new DotnetPrompt.Infrastructure.Models.ChatMessage
             {
                 Role = msg.Role.ToString(),
                 Content = msg.Content,
@@ -53,7 +53,7 @@ public class FileProgressManager : IProgressManager
             // Create progress data structure
             var progressData = new WorkflowProgressFile
             {
-                WorkflowMetadata = new WorkflowMetadata
+                WorkflowMetadata = new DotnetPrompt.Infrastructure.Models.WorkflowMetadata
                 {
                     Id = workflowId,
                     FilePath = context.GetVariable<string>("workflow_file") ?? string.Empty,
