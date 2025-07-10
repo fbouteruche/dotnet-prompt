@@ -575,6 +575,146 @@ When moving or creating documentation:
 - Navigation index (`docs/README.md`) must be kept current
 - Documentation changes require validation of all affected links
 
+## Prompt Directory Organization Standards
+
+The project maintains two distinct prompt-related directories that serve complementary but separate purposes. **Strict separation must be maintained** to ensure clarity and proper project organization.
+
+### Directory Structure Rules
+
+```
+prompts/                         # Development and testing resource
+├── README.md                    # Developer-focused documentation
+├── testing/                     # Test scenarios and validation prompts
+├── development/                 # Development workflow prompts
+├── integration/                 # Integration testing prompts
+└── experimental/                # Prototyping and R&D prompts
+
+docs/examples/                   # User-facing documentation (existing)
+├── configurations/              # Configuration file examples
+└── workflows/                   # User workflow examples by category
+```
+
+### Purpose and Audience Definitions
+
+**`prompts/` Directory - Development Resource:**
+- **Purpose**: Development, testing, and contributor workflows
+- **Target Audience**: Developers, contributors, maintainers
+- **Content Focus**: Functional testing, feature validation, development scenarios
+- **Quality Standards**: Must execute successfully and test specific functionality
+- **Maintenance**: Updated during development cycles and feature additions
+
+**`docs/examples/` Directory - User Documentation:**
+- **Purpose**: User education, tutorials, and production-ready templates
+- **Target Audience**: End users learning to use dotnet-prompt
+- **Content Focus**: Copy-paste solutions, learning materials, best practices
+- **Quality Standards**: Must be functional, tested, and follow documentation standards
+- **Maintenance**: Updated with user feedback and feature releases
+
+### Content Guidelines
+
+**✅ `prompts/` Directory Should Contain:**
+- Feature testing and validation prompts
+- Development workflow automation
+- Integration testing scenarios
+- Experimental prototypes and R&D work
+- Performance benchmarking prompts
+- Regression testing workflows
+- Tool plugin testing scenarios
+- Complex development use cases
+
+**✅ `docs/examples/` Directory Should Contain:**
+- Getting started tutorials and workflows
+- Production-ready configuration examples
+- Best practice implementations
+- Common use case solutions
+- Integration pattern demonstrations
+- Step-by-step learning materials
+- User scenario templates
+
+**❌ Anti-Patterns - Do NOT Place In Either Directory:**
+- Temporary or personal development files
+- Incomplete or broken prompts
+- Experimental code without documentation
+- Prompts with hardcoded secrets or credentials
+- Platform-specific prompts without cross-platform alternatives
+
+### Cross-Pollination Strategy
+
+**Development → User Examples Flow:**
+1. **Validation Phase**: Prompts in `prompts/` must be thoroughly tested
+2. **Polish Phase**: Convert development prompts to user-friendly versions
+3. **Documentation Phase**: Add comprehensive documentation and context
+4. **Migration Phase**: Move polished versions to appropriate `docs/examples/` subdirectory
+5. **Maintenance Phase**: Maintain both versions with clear purposes
+
+**User Examples → Development Flow:**
+1. **Feedback Collection**: User issues and enhancement requests
+2. **Test Case Creation**: Create regression tests in `prompts/testing/`
+3. **Feature Development**: Develop new capabilities in `prompts/development/`
+4. **Integration Testing**: Validate with real scenarios in `prompts/integration/`
+
+### File Naming Conventions
+
+**`prompts/` Directory:**
+- Use descriptive, technical naming: `test-semantic-kernel-integration.prompt.md`
+- Include category prefixes: `dev-`, `test-`, `integration-`, `experimental-`
+- Focus on functionality: `validate-mcp-client-connection.prompt.md`
+
+**`docs/examples/` Directory:**
+- Use user-friendly naming: `getting-started-workflow.prompt.md`
+- Include difficulty indicators: `basic-`, `advanced-`, `enterprise-`
+- Focus on use cases: `analyze-project-structure.prompt.md`
+
+### Quality Standards
+
+**`prompts/` Directory Requirements:**
+- Must execute without errors in development environment
+- Include comprehensive YAML frontmatter for testing
+- Document expected outcomes and validation criteria
+- Include performance and resource usage considerations
+- Maintain compatibility with CI/CD testing pipelines
+
+**`docs/examples/` Directory Requirements:**
+- Must be functional and tested according to documentation standards
+- Include clear descriptions and usage instructions
+- Follow established documentation hierarchy and linking
+- Provide copy-paste ready solutions with minimal modification
+- Include troubleshooting guidance for common issues
+
+### Integration with Project Standards
+
+**Alignment with Clean Architecture:**
+- `prompts/` supports development and testing layers
+- `docs/examples/` supports user interface and documentation layers
+- Both maintain separation of concerns and clear boundaries
+
+**Semantic Kernel Integration:**
+- Both directories use consistent SK patterns and conventions
+- Development prompts test SK functionality thoroughly
+- User examples demonstrate SK best practices
+
+**Configuration Hierarchy Respect:**
+- Both directories respect CLI → Frontmatter → Project → Global hierarchy
+- Development prompts test configuration precedence
+- User examples demonstrate proper configuration usage
+
+### Maintenance Responsibilities
+
+**Contributors Must:**
+- Place development and testing content in `prompts/`
+- Place user-facing examples in `docs/examples/`
+- Update both directories when making related changes
+- Validate cross-references between directories
+- Follow established quality standards for each directory
+
+**Forbidden Practices:**
+- ❌ Mixing development and user content in the same directory
+- ❌ Placing untested or experimental content in `docs/examples/`
+- ❌ Using `docs/examples/` for development testing
+- ❌ Creating duplicate content without clear purpose differentiation
+- ❌ Breaking established directory organization standards
+- ❌ Ignoring cross-reference updates when moving content
+
 ---
 
 When contributing to dotnet-prompt, follow these guidelines to ensure consistency with the project's architecture and goals. The emphasis is on leveraging Microsoft's AI ecosystem (Semantic Kernel, Extensions.AI) rather than building custom implementations.
