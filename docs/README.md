@@ -36,7 +36,7 @@ Detailed specifications for implementers and integrators:
 - **[Workflow Orchestrator Specification](./specifications/workflow-orchestrator-specification.md)** - Execution engine
 - **[Configuration System Specification](./specifications/configuration-system-specification.md)** - Configuration hierarchy
 - **[MCP Integration Specification](./specifications/mcp-integration-specification.md)** - External tool integration
-- **[Progress & Resume Specification](./specifications/progress-resume-specification.md)** - Checkpoint system
+- **[Workflow Resume System Specification](./specifications/workflow-resume-system-specification.md)** - Resume-only state tracking system
 - **[Sub-workflow Composition Specification](./specifications/sub-workflow-composition-specification.md)** - Workflow composition
 - **[Error Handling & Logging Specification](./specifications/error-handling-logging-specification.md)** - Error management
 - **[Built-in Tools API Specification](./specifications/builtin-tools-api-specification.md)** - Framework and tool APIs
