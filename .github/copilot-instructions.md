@@ -484,6 +484,59 @@ tests/                          # Unit, integration, and acceptance tests
 - `DotnetPrompt.Application.Handlers` - MediatR handlers
 - `DotnetPrompt.Infrastructure.Plugins` - SK plugin implementations
 
+### C# File Organization Conventions
+
+Follow standard C# conventions for type organization:
+
+```csharp
+// ✅ Correct: Each public type in its own file
+// File: ProjectAnalysisPlugin.cs
+public class ProjectAnalysisPlugin
+{
+    // Implementation
+}
+
+// File: ProjectAnalysisOptions.cs  
+public class ProjectAnalysisOptions
+{
+    // Implementation
+}
+
+// File: IProjectAnalysisService.cs
+public interface IProjectAnalysisService
+{
+    // Interface definition
+}
+```
+
+**File Organization Rules:**
+- **One public type per file** - Each public class, interface, struct, enum, or delegate should have its own file
+- **File name matches type name** - `ProjectAnalysisPlugin.cs` contains `ProjectAnalysisPlugin` class
+- **Private/internal types exception** - Small private or internal helper types may be co-located in the same file as their consuming public type
+- **Partial classes** - Use separate files for each logical grouping (e.g., `MyClass.Core.cs`, `MyClass.Extensions.cs`)
+- **Nested types** - Public nested types should be in the same file as their containing type
+
+**Examples:**
+```csharp
+// ✅ Correct: Small internal helpers with main type
+// File: WorkflowService.cs
+public class WorkflowService : IWorkflowService
+{
+    // Main implementation
+}
+
+internal class WorkflowHelper // ✅ Internal helper can stay
+{
+    // Helper implementation
+}
+
+// ❌ Avoid: Multiple public types in one file
+// File: Services.cs - DON'T DO THIS
+public class WorkflowService { }
+public class ConfigurationService { } // ❌ Should be in separate file
+public interface IWorkflowService { } // ❌ Should be in separate file
+```
+
 ## Target .NET Version
 - Primary: .NET 8.0 (LTS)
 - Language: C# 12 with latest features
