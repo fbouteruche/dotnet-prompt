@@ -547,13 +547,13 @@ Comprehensive documentation is available in the `/docs` directory:
 ### Technical Specifications
 - **[Product Requirements](./docs/requirements.md)**: Complete feature specification
 - **[Architecture Guide](./docs/architecture.md)**: Technical architecture details
-- **[CLI Reference](./docs/cli-interface-specification.md)**: Complete command documentation
-- **[Configuration System](./docs/configuration-system-specification.md)**: Configuration hierarchy and options
-- **[Workflow Format](./docs/workflow-format-specification.md)**: dotprompt format specification
-- **[Built-in Tools](./docs/builtin-tools-api-specification.md)**: Framework and tool specifications
-- **[MCP Integration](./docs/mcp-integration-specification.md)**: External tool integration
-- **[Progress & Resume](./docs/progress-resume-specification.md)**: Checkpoint system
-- **[Error Handling](./docs/error-handling-logging-specification.md)**: Error management and logging
+- **[CLI Reference](./docs/specifications/cli-interface-specification.md)**: Complete command documentation
+- **[Configuration System](./docs/specifications/configuration-system-specification.md)**: Configuration hierarchy and options
+- **[Workflow Format](./docs/specifications/workflow-format-specification.md)**: dotprompt format specification
+- **[Built-in Tools](./docs/specifications/builtin-tools-api-specification.md)**: Framework and tool specifications
+- **[MCP Integration](./docs/specifications/mcp-integration-specification.md)**: External tool integration
+- **[Progress & Resume](./docs/specifications/progress-resume-specification.md)**: Checkpoint system
+- **[Error Handling](./docs/specifications/error-handling-logging-specification.md)**: Error management and logging
 
 [↑ Back to Top](#table-of-contents)
 
