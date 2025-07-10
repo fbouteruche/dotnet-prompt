@@ -547,6 +547,6 @@ server.start();
 ## Next Steps
 
 - **[Advanced Workflows](./advanced-workflows.md)**: Complex scenarios using MCP integration
-- **[Real-world Examples](../examples/mcp-workflows/)**: Production MCP workflow patterns
+- **[Real-world Examples](../examples/workflows/mcp-workflows/)**: Production MCP workflow patterns
 - **[Built-in Tools Reference](../reference/built-in-tools.md)**: Compare with built-in capabilities
 - **[Troubleshooting](./troubleshooting.md)**: More debugging guidance

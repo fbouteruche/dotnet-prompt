@@ -489,6 +489,92 @@ tests/                          # Unit, integration, and acceptance tests
 - Language: C# 12 with latest features
 - Framework: Cross-platform (Windows, macOS, Linux)
 
+## Documentation Organization Standards
+
+### Directory Structure Rules
+The documentation follows a strict organizational hierarchy:
+
+```
+docs/
+├── README.md                    # Comprehensive navigation index
+├── architecture.md              # Technical architecture details  
+├── requirements.md              # Product requirements and roadmap
+├── user-guide/                  # End-user documentation
+├── reference/                   # Quick reference materials
+├── specifications/              # Technical specifications for implementers
+├── developer/                   # Tool developer and contributor docs
+└── examples/                    # Working examples and templates
+    ├── configurations/          # Configuration file examples
+    └── workflows/               # Workflow examples by category
+```
+
+### File Placement Guidelines
+
+**User-Facing Documentation** (`user-guide/`):
+- Getting started tutorials and installation guides
+- Basic and advanced workflow examples  
+- Format specifications and integration guides
+- Troubleshooting and FAQ content
+- Target audience: End users learning to use dotnet-prompt
+
+**Technical Specifications** (`specifications/`):
+- Detailed implementation specifications for all components
+- API specifications and interface contracts
+- Technical requirements and design constraints
+- Target audience: Implementers, integrators, and technical decision makers
+
+**Developer Documentation** (`developer/`):
+- Tool development guides and API documentation
+- Configuration guides for development scenarios
+- Contributor guidelines and extension patterns
+- Target audience: Tool developers and contributors
+
+**Reference Materials** (`reference/`):
+- CLI command reference and quick lookup guides
+- Configuration option references
+- Built-in tool API references
+- Target audience: Users needing quick reference information
+
+**Examples and Templates** (`examples/`):
+- Working configuration examples in `configurations/`
+- Workflow examples organized by category in `workflows/`
+- All examples must be functional and tested
+- Target audience: Users looking for copy-paste solutions
+
+### Cross-Reference Update Requirements
+When moving or creating documentation:
+
+1. **Update Internal Links**: All relative links must reflect new file locations
+2. **Update Navigation**: Ensure new content is linked from `docs/README.md`
+3. **Update Project README**: Update main project README links if needed
+4. **Validate Links**: Test all documentation links after changes
+
+### Common Link Update Patterns
+```markdown
+# Before restructuring
+[CLI Specification](./cli-interface-specification.md)
+[Example](../examples/basic-workflow.md)
+
+# After restructuring  
+[CLI Specification](./specifications/cli-interface-specification.md)
+[Example](../examples/workflows/basic-workflows/basic-workflow.md)
+```
+
+### Forbidden Documentation Patterns
+- ❌ Specification files in root `docs/` directory
+- ❌ Tool documentation mixed with user guides
+- ❌ Examples scattered across multiple directory structures
+- ❌ Documentation without clear audience targeting
+- ❌ Broken internal links or missing navigation
+- ❌ Documentation that doesn't follow the established hierarchy
+
+### Documentation Maintenance
+- All new documentation must include proper navigation links
+- Cross-references must be updated when files are moved
+- Examples must be validated and functional
+- Navigation index (`docs/README.md`) must be kept current
+- Documentation changes require validation of all affected links
+
 ---
 
 When contributing to dotnet-prompt, follow these guidelines to ensure consistency with the project's architecture and goals. The emphasis is on leveraging Microsoft's AI ecosystem (Semantic Kernel, Extensions.AI) rather than building custom implementations.

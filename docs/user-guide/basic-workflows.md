@@ -472,7 +472,7 @@ Ready for more advanced scenarios?
 - **[Advanced Workflows](./advanced-workflows.md)**: Complex multi-step scenarios
 - **[MCP Integration](./mcp-integration.md)**: Using external tools and services
 - **[Sub-workflow Composition](./advanced-workflows.md#sub-workflow-composition)**: Building reusable workflow components
-- **[Real-world Examples](../examples/real-world-scenarios/)**: Production-ready workflow patterns
+- **[Real-world Examples](../examples/workflows/real-world-scenarios/)**: Production-ready workflow patterns
 
 ## Troubleshooting
 

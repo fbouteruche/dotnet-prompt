@@ -475,9 +475,9 @@ The following built-in tools have dedicated specification documents:
 
 | Tool | Document | Status |
 |------|----------|--------|
-| Project Analysis Tool | [project-analysis-tool.md](./project-analysis-tool.md) | 🚧 Draft |
-| Build & Test Tool | [build-test-tool.md](./build-test-tool.md) | 🚧 Draft |
-| File System Tool | [file-system-tool.md](./file-system-tool.md) | 🚧 Draft |
+| Project Analysis Tool | [project-analysis-tool.md](../developer/project-analysis-tool.md) | 🚧 Draft |
+| Build & Test Tool | [build-test-tool.md](../developer/build-test-tool.md) | 🚧 Draft |
+| File System Tool | [file-system-tool.md](../developer/file-system-tool.md) | 🚧 Draft |
 
 ## Open Questions for Future Consideration
 

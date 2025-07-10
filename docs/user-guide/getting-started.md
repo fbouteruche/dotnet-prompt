@@ -129,6 +129,6 @@ dotnet prompt --version
 - **CLI Help**: `dotnet prompt --help`
 - **Command Help**: `dotnet prompt run --help`
 - **Troubleshooting**: [Common Issues](./troubleshooting.md)
-- **Examples**: Browse the [examples directory](../examples/)
+- **Examples**: Browse the [examples directory](../examples/) for organized workflows and configurations
 
 Ready to automate your development workflow? Let's go! 🚀

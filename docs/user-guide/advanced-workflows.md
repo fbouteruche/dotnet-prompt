@@ -850,7 +850,7 @@ Each stage must pass completely before proceeding to the next stage. Generate co
 
 With these advanced patterns, you can create sophisticated automation workflows:
 
-- **[Real-world Examples](../examples/real-world-scenarios/)**: See these patterns in production scenarios
+- **[Real-world Examples](../examples/workflows/real-world-scenarios/)**: See these patterns in production scenarios
 - **[MCP Integration](./mcp-integration.md)**: Enhance workflows with external tools
 - **[Troubleshooting](./troubleshooting.md)**: Debug complex workflow issues
 - **[CLI Reference](../reference/cli-commands.md)**: Advanced CLI options for complex workflows
