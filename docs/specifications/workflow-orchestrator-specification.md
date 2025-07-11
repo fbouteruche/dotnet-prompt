@@ -202,11 +202,12 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 errors.Add("Workflow content cannot be empty");
             }
 
-            // 2. Validate frontmatter configuration - MODEL REQUIRED
+            // 2. Validate frontmatter configuration - MODEL REQUIRED, PROVIDER DEFAULTS
             if (string.IsNullOrEmpty(workflow.Model))
             {
-                errors.Add("Model specification is required. No fallback defaults are provided. " +
-                          "Please specify a model in workflow frontmatter (e.g., model: \"gpt-4o\")");
+                errors.Add("Model specification is required. No fallback defaults are provided for models. " +
+                          "Please specify a model in workflow frontmatter (e.g., model: \"gpt-4o\"). " +
+                          "Note: Provider defaults to \"github\" if not specified.");
             }
 
             // 3. Validate Handlebars template syntax

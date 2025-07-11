@@ -86,7 +86,7 @@ config:                           # Model-specific settings
 ---
 ```
 
-**⚠️ Important**: The `model` field is **required**. If not specified, the workflow will fail with an error message. There are no default fallbacks.
+**⚠️ Important**: The `model` field is **required**. If not specified, the workflow will fail with an error message. There are no default fallbacks for models. However, if no provider is specified, it defaults to "github".
 
 ### 2. Markdown Content (Instructions)
 ```markdown
@@ -106,16 +106,21 @@ If you forget to specify required configuration, you'll see helpful error messag
 # Missing model specification
 $ dotnet prompt run workflow-without-model.prompt.md
 Error: Model specification is required. Please specify a model in workflow frontmatter:
-  model: "gpt-4o"           # GitHub Models
+  model: "gpt-4o"           # GitHub Models (default provider)
   model: "openai/gpt-4"     # OpenAI
   model: "azure/gpt-4"      # Azure OpenAI
 
-# Unknown provider
+# Unknown provider (no fallback)
 $ dotnet prompt run workflow-bad-provider.prompt.md  
 Error: Unknown AI provider: 'invalid-provider'. 
 Supported providers: openai, github, azure, anthropic, local, ollama.
 Please specify a valid provider in workflow frontmatter or configuration.
 ```
+
+**Key Points:**
+- **Model is required** - no fallback defaults provided
+- **Provider defaults to "github"** if not specified
+- **Unknown providers fail** - no fallback to default provider
 ## Next Steps
 
 Now that you've created your first workflow, explore these guides:
