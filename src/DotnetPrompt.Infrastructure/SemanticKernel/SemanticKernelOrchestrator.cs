@@ -48,8 +48,45 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             _logger.LogInformation("Starting SK-native workflow execution with Handlebars templating: {WorkflowName}", 
                 workflow.Name ?? "unnamed");
             
+            // Extract provider and configuration from context
+            Dictionary<string, object>? providerConfig = null;
+            string? providerName = null;
+            
+            if (context.Configuration != null)
+            {
+                providerName = context.Configuration.DefaultProvider;
+                var model = context.Configuration.DefaultModel;
+                
+                _logger.LogInformation("Using configuration from context: Provider={Provider}, Model={Model}", 
+                    providerName, model);
+                
+                // Build provider configuration from resolved configuration
+                if (!string.IsNullOrEmpty(model))
+                {
+                    providerConfig = new Dictionary<string, object> { ["Model"] = model };
+                    
+                    // Add provider-specific configuration if available
+                    if (!string.IsNullOrEmpty(providerName) && 
+                        context.Configuration.Providers.TryGetValue(providerName, out var provider))
+                    {
+                        if (!string.IsNullOrEmpty(provider.ApiKey))
+                            providerConfig["ApiKey"] = provider.ApiKey;
+                        if (!string.IsNullOrEmpty(provider.Token))
+                            providerConfig["Token"] = provider.Token;
+                        if (!string.IsNullOrEmpty(provider.Endpoint))
+                            providerConfig["Endpoint"] = provider.Endpoint;
+                        if (!string.IsNullOrEmpty(provider.BaseUrl))
+                            providerConfig["BaseUrl"] = provider.BaseUrl;
+                    }
+                }
+            }
+            else
+            {
+                _logger.LogWarning("No configuration found in context - kernel creation may fail without explicit model");
+            }
+            
             // 1. Get or create kernel with required plugins and MCP servers from workflow
-            _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow);
+            _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow, null, providerName, providerConfig);
 
             // 2. Create SK Handlebars template configuration
             var promptConfig = new PromptTemplateConfig
@@ -191,7 +228,14 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             }
 
             // Validate provider configuration exists
-            var providerName = ExtractProviderFromModel(workflow.Model) ?? "openai";
+            var providerName = context.Configuration?.DefaultProvider ?? ExtractProviderFromModel(workflow.Model) ?? "openai";
+            var modelName = context.Configuration?.DefaultModel ?? workflow.Model;
+            
+            if (string.IsNullOrEmpty(modelName))
+            {
+                errors.Add("No model specified in workflow frontmatter or configuration. Please specify a model using 'model: \"model-name\"' in the workflow frontmatter.");
+            }
+            
             if (!IsProviderConfigured(providerName))
             {
                 warnings.Add($"AI provider '{providerName}' may not be properly configured. Ensure required environment variables or configuration are set before execution.");
@@ -296,7 +340,36 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             }
 
             // 3. Get or create kernel with required plugins and MCP servers from workflow
-            _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow);
+            // Extract provider and configuration from restored context
+            Dictionary<string, object>? providerConfig = null;
+            string? providerName = null;
+            
+            if (restoredContext.Configuration != null)
+            {
+                providerName = restoredContext.Configuration.DefaultProvider;
+                var model = restoredContext.Configuration.DefaultModel;
+                
+                if (!string.IsNullOrEmpty(model))
+                {
+                    providerConfig = new Dictionary<string, object> { ["Model"] = model };
+                    
+                    // Add provider-specific configuration if available
+                    if (!string.IsNullOrEmpty(providerName) && 
+                        restoredContext.Configuration.Providers.TryGetValue(providerName, out var provider))
+                    {
+                        if (!string.IsNullOrEmpty(provider.ApiKey))
+                            providerConfig["ApiKey"] = provider.ApiKey;
+                        if (!string.IsNullOrEmpty(provider.Token))
+                            providerConfig["Token"] = provider.Token;
+                        if (!string.IsNullOrEmpty(provider.Endpoint))
+                            providerConfig["Endpoint"] = provider.Endpoint;
+                        if (!string.IsNullOrEmpty(provider.BaseUrl))
+                            providerConfig["BaseUrl"] = provider.BaseUrl;
+                    }
+                }
+            }
+            
+            _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow, null, providerName, providerConfig);
 
             // 4. Restore conversation state
             _conversationStore[workflowId] = restoredChatHistory;

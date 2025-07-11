@@ -58,11 +58,12 @@ public class KernelFactoryTests
     {
         // Arrange
         Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token"); // KernelFactory defaults to GitHub Models
+        var config = new Dictionary<string, object> { { "Model", "gpt-4o" } }; // Explicit model required
         
         try
         {
             // Act
-            var kernel = await _factory.CreateKernelAsync();
+            var kernel = await _factory.CreateKernelAsync("github", config);
 
             // Assert
             Assert.NotNull(kernel);
@@ -78,11 +79,12 @@ public class KernelFactoryTests
     {
         // Arrange
         Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
+        var config = new Dictionary<string, object> { { "Model", "gpt-4" } }; // Explicit model required
         
         try
         {
             // Act
-            var kernel = await _factory.CreateKernelAsync("openai");
+            var kernel = await _factory.CreateKernelAsync("openai", config);
 
             // Assert
             Assert.NotNull(kernel);
@@ -98,11 +100,12 @@ public class KernelFactoryTests
     {
         // Arrange
         Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
+        var config = new Dictionary<string, object> { { "Model", "gpt-4o" } }; // Explicit model required
         
         try
         {
             // Act
-            var kernel = await _factory.CreateKernelAsync("github");
+            var kernel = await _factory.CreateKernelAsync("github", config);
 
             // Assert
             Assert.NotNull(kernel);
@@ -120,7 +123,8 @@ public class KernelFactoryTests
         Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key");
         var configuration = new Dictionary<string, object>
         {
-            { "Endpoint", "https://test.openai.azure.com" }
+            { "Endpoint", "https://test.openai.azure.com" },
+            { "Model", "gpt-4" } // Explicit model required
         };
         
         try
@@ -155,11 +159,12 @@ public class KernelFactoryTests
     {
         // Arrange
         Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
+        var config = new Dictionary<string, object> { { "Model", "gpt-4o" } }; // Explicit model required
         
         try
         {
             // Act
-            var kernel = await _factory.CreateKernelAsync("unknown-provider");
+            var kernel = await _factory.CreateKernelAsync("unknown-provider", config);
 
             // Assert
             Assert.NotNull(kernel);
@@ -199,6 +204,7 @@ public class KernelFactoryTests
     {
         // Arrange
         Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
+        var config = new Dictionary<string, object> { { "Model", "gpt-4o" } }; // Explicit model required
         var pluginTypes = new[]
         {
             typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin),
@@ -208,7 +214,7 @@ public class KernelFactoryTests
         try
         {
             // Act
-            var kernel = await _factory.CreateKernelWithPluginsAsync(pluginTypes);
+            var kernel = await _factory.CreateKernelWithPluginsAsync(pluginTypes, "github", config);
 
             // Assert
             Assert.NotNull(kernel);
@@ -227,7 +233,10 @@ public class KernelFactoryTests
     public async Task CreateKernelAsync_WithValidProviders_CreatesKernelWhenConfigured(string provider)
     {
         // Arrange - Set up environment variables for each provider
-        Dictionary<string, object>? config = null;
+        Dictionary<string, object> config = new Dictionary<string, object>
+        {
+            { "Model", "gpt-4" } // Explicit model required
+        };
         
         switch (provider)
         {
@@ -236,10 +245,11 @@ public class KernelFactoryTests
                 break;
             case "github":
                 Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
+                config["Model"] = "gpt-4o"; // GitHub Models uses different model
                 break;
             case "azure":
                 Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key");
-                config = new Dictionary<string, object> { { "Endpoint", "https://test.openai.azure.com" } };
+                config["Endpoint"] = "https://test.openai.azure.com";
                 break;
         }
 
@@ -272,8 +282,11 @@ public class KernelFactoryTests
     [Fact]
     public async Task CreateKernelAsync_WithLocalProvider_ConfiguresCorrectly()
     {
+        // Arrange
+        var config = new Dictionary<string, object> { { "Model", "llama3" } }; // Explicit model required
+        
         // Act & Assert - Local provider shouldn't throw as it uses dummy API key
-        var kernel = await _factory.CreateKernelAsync("local");
+        var kernel = await _factory.CreateKernelAsync("local", config);
         Assert.NotNull(kernel);
     }
 
@@ -285,5 +298,115 @@ public class KernelFactoryTests
             async () => await _factory.CreateKernelAsync("anthropic"));
         
         Assert.Contains("Failed to configure AI provider 'anthropic'", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("github")]
+    [InlineData("azure")]
+    [InlineData("local")]
+    public async Task CreateKernelAsync_WithoutModel_ThrowsInvalidOperationException(string provider)
+    {
+        // Arrange - Set up credentials but no model
+        Dictionary<string, object>? config = null;
+        
+        switch (provider)
+        {
+            case "openai":
+                Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
+                break;
+            case "github":
+                Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
+                break;
+            case "azure":
+                Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key");
+                config = new Dictionary<string, object> { { "Endpoint", "https://test.openai.azure.com" } };
+                break;
+            case "local":
+                // Local provider doesn't need credentials
+                break;
+        }
+
+        try
+        {
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                async () => await _factory.CreateKernelAsync(provider, config));
+            
+            Assert.Contains("No model specified", exception.Message);
+            Assert.Contains("Please specify a model", exception.Message);
+        }
+        finally
+        {
+            // Cleanup
+            switch (provider)
+            {
+                case "openai":
+                    Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
+                    break;
+                case "github":
+                    Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+                    break;
+                case "azure":
+                    Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", null);
+                    break;
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("openai", "gpt-4")]
+    [InlineData("github", "gpt-4o")]
+    [InlineData("azure", "gpt-35-turbo")]
+    [InlineData("local", "llama3")]
+    public async Task CreateKernelAsync_WithExplicitModel_CreatesKernelSuccessfully(string provider, string model)
+    {
+        // Arrange - Set up credentials and model
+        Dictionary<string, object> config = new Dictionary<string, object>
+        {
+            { "Model", model }
+        };
+        
+        switch (provider)
+        {
+            case "openai":
+                Environment.SetEnvironmentVariable("OPENAI_API_KEY", "test-key");
+                break;
+            case "github":
+                Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
+                break;
+            case "azure":
+                Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key");
+                config["Endpoint"] = "https://test.openai.azure.com";
+                break;
+            case "local":
+                // Local provider doesn't need credentials
+                break;
+        }
+
+        try
+        {
+            // Act
+            var kernel = await _factory.CreateKernelAsync(provider, config);
+
+            // Assert
+            Assert.NotNull(kernel);
+        }
+        finally
+        {
+            // Cleanup
+            switch (provider)
+            {
+                case "openai":
+                    Environment.SetEnvironmentVariable("OPENAI_API_KEY", null);
+                    break;
+                case "github":
+                    Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
+                    break;
+                case "azure":
+                    Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", null);
+                    break;
+            }
+        }
     }
 }

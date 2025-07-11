@@ -213,4 +213,67 @@ public class WorkflowServiceTests
             File.Delete(validWorkflowFile);
         }
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithWorkflowModel_LoadsConfigurationWithModel()
+    {
+        // Arrange
+        var tempFile = Path.GetTempFileName();
+        var validWorkflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
+        await File.WriteAllTextAsync(validWorkflowFile, "# Valid workflow content");
+        var options = new WorkflowExecutionOptions(DryRun: false);
+
+        var mockWorkflow = new DotpromptWorkflow
+        {
+            Name = "test-workflow",
+            Model = "gpt-4.1", // Specify model in workflow
+            FilePath = validWorkflowFile,
+            Content = new WorkflowContent { RawMarkdown = "# Valid workflow content" }
+        };
+
+        var mockConfiguration = new DotPromptConfiguration
+        {
+            DefaultProvider = "github",
+            DefaultModel = "gpt-4.1"
+        };
+        
+        _mockParser.Setup(p => p.ParseFileAsync(validWorkflowFile, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(mockWorkflow);
+
+        _mockConfigurationService.Setup(c => c.LoadConfigurationAsync(
+                null, null, null, null, It.IsAny<string>(), "gpt-4.1", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(mockConfiguration);
+
+        _mockWorkflowOrchestrator.Setup(e => e.ExecuteWorkflowAsync(
+                It.IsAny<DotpromptWorkflow>(), 
+                It.Is<WorkflowExecutionContext>(ctx => ctx.Configuration != null && ctx.Configuration.DefaultModel == "gpt-4.1"), 
+                It.IsAny<CancellationToken>()))
+                           .ReturnsAsync(new WorkflowExecutionResult(true, "Workflow executed with correct model"));
+
+        try
+        {
+            // Act
+            var result = await _workflowService.ExecuteAsync(validWorkflowFile, options);
+
+            // Assert
+            Assert.True(result.Success);
+            Assert.Contains("executed", result.Output ?? string.Empty);
+            
+            // Verify that configuration service was called with the workflow model
+            _mockConfigurationService.Verify(c => c.LoadConfigurationAsync(
+                null, null, null, null, It.IsAny<string>(), "gpt-4.1", It.IsAny<CancellationToken>()), 
+                Times.Once);
+            
+            // Verify that orchestrator received context with configuration
+            _mockWorkflowOrchestrator.Verify(e => e.ExecuteWorkflowAsync(
+                It.IsAny<DotpromptWorkflow>(), 
+                It.Is<WorkflowExecutionContext>(ctx => ctx.Configuration != null && ctx.Configuration.DefaultModel == "gpt-4.1"), 
+                It.IsAny<CancellationToken>()), 
+                Times.Once);
+        }
+        finally
+        {
+            File.Delete(validWorkflowFile);
+        }
+    }
 }

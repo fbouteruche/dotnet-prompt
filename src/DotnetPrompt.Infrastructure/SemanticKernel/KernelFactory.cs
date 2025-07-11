@@ -187,10 +187,13 @@ public class KernelFactory : IKernelFactory
 
         var model = GetConfigValue(config, "Model") 
                  ?? _configuration["AI:OpenAI:Model"] 
-                 ?? "gpt-4o";
+                 ?? throw new InvalidOperationException(
+                    "No model specified for OpenAI provider. " +
+                    "Please specify a model in workflow frontmatter (model: \"gpt-4\") " +
+                    "or configure AI:OpenAI:Model in your settings.");
 
         builder.AddOpenAIChatCompletion(model, apiKey);
-        _logger.LogDebug("Configured OpenAI with model: {Model}", model);
+        _logger.LogInformation("Configured OpenAI with model: {Model}", model);
     }
 
     private void ConfigureGitHubModels(IKernelBuilder builder, Dictionary<string, object>? config)
@@ -202,7 +205,10 @@ public class KernelFactory : IKernelFactory
 
         var model = GetConfigValue(config, "Model") 
                  ?? _configuration["AI:GitHub:Model"] 
-                 ?? "gpt-4o";
+                 ?? throw new InvalidOperationException(
+                    "No model specified for GitHub Models provider. " +
+                    "Please specify a model in workflow frontmatter (model: \"gpt-4o\") " +
+                    "or configure AI:GitHub:Model in your settings.");
 
         // GitHub Models uses OpenAI-compatible API
         #pragma warning disable SKEXP0010
@@ -212,7 +218,7 @@ public class KernelFactory : IKernelFactory
             endpoint: new Uri("https://models.inference.ai.azure.com"));
         #pragma warning restore SKEXP0010
         
-        _logger.LogDebug("Configured GitHub Models with model: {Model}", model);
+        _logger.LogInformation("Configured GitHub Models with model: {Model}", model);
     }
 
     private void ConfigureAzureOpenAI(IKernelBuilder builder, Dictionary<string, object>? config)
@@ -228,10 +234,13 @@ public class KernelFactory : IKernelFactory
 
         var model = GetConfigValue(config, "Model") 
                  ?? _configuration["AI:Azure:Model"] 
-                 ?? "gpt-4o";
+                 ?? throw new InvalidOperationException(
+                    "No model specified for Azure OpenAI provider. " +
+                    "Please specify a model in workflow frontmatter (model: \"gpt-4\") " +
+                    "or configure AI:Azure:Model in your settings.");
 
         builder.AddAzureOpenAIChatCompletion(model, endpoint, apiKey);
-        _logger.LogDebug("Configured Azure OpenAI with model: {Model} at endpoint: {Endpoint}", model, endpoint);
+        _logger.LogInformation("Configured Azure OpenAI with model: {Model} at endpoint: {Endpoint}", model, endpoint);
     }
 
     private void ConfigureAnthropic(IKernelBuilder builder, Dictionary<string, object>? config)
@@ -248,7 +257,10 @@ public class KernelFactory : IKernelFactory
 
         var model = GetConfigValue(config, "Model") 
                  ?? _configuration["AI:Local:Model"] 
-                 ?? "llama3";
+                 ?? throw new InvalidOperationException(
+                    "No model specified for local provider. " +
+                    "Please specify a model in workflow frontmatter (model: \"llama3\") " +
+                    "or configure AI:Local:Model in your settings.");
 
         // For local providers like Ollama, we can use OpenAI-compatible API
         #pragma warning disable SKEXP0010
@@ -258,7 +270,7 @@ public class KernelFactory : IKernelFactory
             endpoint: new Uri(endpoint));
         #pragma warning restore SKEXP0010
         
-        _logger.LogDebug("Configured local provider with model: {Model} at endpoint: {Endpoint}", model, endpoint);
+        _logger.LogInformation("Configured local provider with model: {Model} at endpoint: {Endpoint}", model, endpoint);
     }
 
     private static string? GetConfigValue(Dictionary<string, object>? config, string key)
