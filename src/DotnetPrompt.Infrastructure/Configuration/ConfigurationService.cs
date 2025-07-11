@@ -39,8 +39,6 @@ public class ConfigurationService : IConfigurationService
         _logger.LogDebug("Loading configuration with CLI overrides: Provider={Provider}, Model={Model}, Verbose={Verbose}, WorkflowModel={WorkflowModel}",
             cliProvider, cliModel, cliVerbose, workflowModel);
 
-        System.Console.WriteLine($"DEBUG: LoadConfigurationAsync called with workflowModel='{workflowModel}'");
-
         var configBuilder = new ConfigurationBuilder();
 
         // 1. Load environment variables (they need to be loaded first to support substitution)
@@ -267,14 +265,11 @@ public class ConfigurationService : IConfigurationService
             var parts = workflowModel.Split('/', 2);
             config.DefaultProvider = parts[0];
             config.DefaultModel = parts[1];
-            // Debug: Add some logging to see what's happening
-            System.Console.WriteLine($"DEBUG: Parsed workflow model '{workflowModel}' -> Provider: '{config.DefaultProvider}', Model: '{config.DefaultModel}'");
         }
         else
         {
             // Model only - use configured provider, only override model
             config.DefaultModel = workflowModel;
-            System.Console.WriteLine($"DEBUG: Set workflow model '{workflowModel}' with provider: '{config.DefaultProvider}'");
         }
     }
 
