@@ -46,18 +46,24 @@ public class ConfigurationService : IConfigurationService
 
         // 2. Load global configuration (lowest priority)
         var globalConfigPath = GetGlobalConfigurationPath();
+        // Log the global configuration path as information
+        _logger.LogDebug("Loading global configuration from: {GlobalConfigPath}", globalConfigPath);
         LoadConfigurationFile(configBuilder, globalConfigPath, "global");
 
         // 3. Load project configuration
         if (!string.IsNullOrEmpty(projectPath))
         {
             var projectConfigPath = GetProjectConfigurationPath(projectPath);
+            // Log the project configuration path as information
+            _logger.LogDebug("Loading project configuration from: {ProjectConfigPath}", projectConfigPath);
             LoadConfigurationFile(configBuilder, projectConfigPath, "project");
         }
 
         // 4. Load custom config file if specified
         if (!string.IsNullOrEmpty(cliConfigFile))
         {
+            // Log the custom configuration file path as information
+            _logger.LogDebug("Loading custom configuration from: {CustomConfigFile}", cliConfigFile);
             LoadConfigurationFile(configBuilder, cliConfigFile, "custom");
         }
 
@@ -67,13 +73,19 @@ public class ConfigurationService : IConfigurationService
         var dotPromptConfig = new DotPromptConfiguration();
 
         // Apply configuration from files
-        BindConfigurationToModel(configuration, dotPromptConfig);
+        BindConfigurationToModel(_logger, configuration, dotPromptConfig);
 
         // Apply workflow frontmatter model override (before CLI overrides)
         ApplyWorkflowModelOverride(dotPromptConfig, workflowModel);
 
         // Apply CLI overrides (highest priority)
         ApplyCliOverrides(dotPromptConfig, cliProvider, cliModel, cliVerbose);
+
+        // Log default provider name
+        if (!string.IsNullOrEmpty(dotPromptConfig.DefaultProvider))
+        {
+            _logger.LogInformation("Default provider loaded: {Provider}", dotPromptConfig.DefaultProvider);
+        }
 
         // Apply environment variable substitution
         SubstituteEnvironmentVariables(dotPromptConfig);
@@ -210,10 +222,16 @@ public class ConfigurationService : IConfigurationService
         }
     }
 
-    private static void BindConfigurationToModel(IConfiguration configuration, DotPromptConfiguration dotPromptConfig)
+    private static void BindConfigurationToModel(ILogger logger, IConfiguration configuration, DotPromptConfiguration dotPromptConfig)
     {
         // Map from environment variables and config files
         dotPromptConfig.DefaultProvider = configuration["default_provider"] ?? configuration["PROVIDER"];
+
+
+
+        // Log default provider as information
+       logger.LogInformation("Default provider after binding configuration: {DefaultProvider}", dotPromptConfig.DefaultProvider);
+       
         dotPromptConfig.DefaultModel = configuration["default_model"] ?? configuration["MODEL"];
         
         if (bool.TryParse(configuration["cache_enabled"], out var cacheEnabled))
