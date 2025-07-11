@@ -43,6 +43,11 @@ public class WorkflowExecutionContext
     public bool RequireAdvancedValidation { get; set; } = false;
 
     /// <summary>
+    /// Configuration for workflow execution
+    /// </summary>
+    public DotPromptConfiguration? Configuration { get; set; }
+
+    /// <summary>
     /// Gets a variable value with type conversion
     /// </summary>
     /// <typeparam name="T">Type to convert to</typeparam>
@@ -96,7 +101,8 @@ public class WorkflowExecutionContext
             CurrentStep = CurrentStep,
             StartTime = StartTime,
             WorkingDirectory = WorkingDirectory,
-            RequireAdvancedValidation = RequireAdvancedValidation
+            RequireAdvancedValidation = RequireAdvancedValidation,
+            Configuration = Configuration
         };
     }
 }
