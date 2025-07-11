@@ -162,9 +162,11 @@ public class KernelFactory : IKernelFactory
                     ConfigureLocalProvider(builder, configuration);
                     break;
                 default:
-                    _logger.LogWarning("Unknown AI provider: {Provider}, falling back to GitHub Models", providerName);
-                    ConfigureGitHubModels(builder, configuration);
-                    break;
+                    var supportedProviders = "openai, github, azure, anthropic, local, ollama";
+                    var errorMessage = $"Unknown AI provider: '{providerName}'. Supported providers are: {supportedProviders}. " +
+                                     "Please specify a valid provider in your workflow frontmatter or configuration.";
+                    _logger.LogError("Unknown AI provider specified: {Provider}", providerName);
+                    throw new InvalidOperationException(errorMessage);
             }
 
             _logger.LogInformation("Successfully configured AI services for provider: {Provider}", providerName);

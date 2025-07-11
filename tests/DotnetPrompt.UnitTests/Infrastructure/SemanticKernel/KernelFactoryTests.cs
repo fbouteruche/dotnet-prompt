@@ -155,24 +155,18 @@ public class KernelFactoryTests
     }
 
     [Fact]
-    public async Task CreateKernelAsync_WithUnknownProvider_DefaultsToGitHub()
+    public async Task CreateKernelAsync_WithUnknownProvider_ThrowsInvalidOperationException()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("GITHUB_TOKEN", "test-token");
-        var config = new Dictionary<string, object> { { "Model", "gpt-4o" } }; // Explicit model required
+        var config = new Dictionary<string, object> { { "Model", "gpt-4o" } };
         
-        try
-        {
-            // Act
-            var kernel = await _factory.CreateKernelAsync("unknown-provider", config);
-
-            // Assert
-            Assert.NotNull(kernel);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("GITHUB_TOKEN", null);
-        }
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await _factory.CreateKernelAsync("unknown-provider", config));
+        
+        Assert.Contains("Unknown AI provider: 'unknown-provider'", exception.Message);
+        Assert.Contains("Supported providers are:", exception.Message);
+        Assert.Contains("openai, github, azure, anthropic, local, ollama", exception.Message);
     }
 
     [Fact]
