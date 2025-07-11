@@ -167,6 +167,57 @@ Error: Tool 'my-custom-tool' not available
    tools: ["project-analysis"]
    ```
 
+#### Issue: Missing required model specification
+```
+Error: Model specification is required. Please specify a model in workflow frontmatter
+```
+
+**Solutions:**
+1. **Add model to workflow frontmatter**:
+   ```yaml
+   ---
+   name: "my-workflow"
+   model: "gpt-4o"           # Add this line
+   tools: ["project-analysis"]
+   ---
+   ```
+
+2. **Use provider/model format**:
+   ```yaml
+   model: "openai/gpt-4"     # OpenAI
+   model: "azure/gpt-4"      # Azure OpenAI
+   model: "local/llama3"     # Local model
+   ```
+
+3. **Check supported providers**:
+   - `openai`, `github`, `azure`, `anthropic`, `local`, `ollama`
+
+**Important**: There are no fallback defaults. The model must be explicitly specified.
+
+#### Issue: Unknown AI provider
+```
+Error: Unknown AI provider: 'invalid-provider'. Supported providers: openai, github, azure, anthropic, local, ollama
+```
+
+**Solutions:**
+1. **Use supported provider format**:
+   ```yaml
+   # ✅ Correct provider names
+   model: "github/gpt-4o"
+   model: "openai/gpt-4" 
+   model: "azure/gpt-4"
+   model: "local/llama3"
+   ```
+
+2. **Check provider spelling**:
+   ```yaml
+   # ❌ Wrong - typo in provider name
+   model: "openia/gpt-4"
+   
+   # ✅ Correct - proper provider name
+   model: "openai/gpt-4"
+   ```
+
 ### Runtime Execution Problems
 
 #### Issue: Workflow timeout

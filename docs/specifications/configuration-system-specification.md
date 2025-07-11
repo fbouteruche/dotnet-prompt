@@ -99,9 +99,8 @@ public class DotNetPromptConfiguration
             config.Provider = cliProvider;
         }
         
-        // Default to GitHub Models if no provider specified
-        config.Provider ??= "github";
-        config.Model ??= "gpt-4o";
+        // NO FALLBACKS: Model and provider must be explicitly specified
+        // If not provided through the hierarchy, execution will fail with clear error messages
         
         return config;
     }
@@ -268,7 +267,9 @@ public static class KernelBuilderExtensions
                 break;
                 
             default:
-                throw new InvalidOperationException($"Unsupported AI provider: {config.Provider}");
+                throw new InvalidOperationException($"Unknown AI provider: {config.Provider}. " +
+                    $"Supported providers: openai, github, azure, anthropic, local, ollama. " +
+                    $"Please specify a valid provider in workflow frontmatter or configuration.");
         }
         
         return builder;
@@ -348,12 +349,63 @@ public static class KernelBuilderExtensions
 - How should we handle configuration change notifications for runtime updates?
 - Should we standardize tool-specific telemetry and metrics collection?
 
+## Error Handling for Missing Configuration
+
+### Required Configuration Validation
+
+**Model and Provider Requirements:**
+```csharp
+// Validation logic ensures explicit configuration
+public static void ValidateRequiredConfiguration(PromptConfiguration config)
+{
+    if (string.IsNullOrEmpty(config.Model))
+    {
+        throw new InvalidOperationException(
+            "Model specification is required. Please specify a model in workflow frontmatter:\n" +
+            "  model: \"gpt-4o\"           # GitHub Models\n" +
+            "  model: \"openai/gpt-4\"     # OpenAI\n" +
+            "  model: \"azure/gpt-4\"      # Azure OpenAI\n" +
+            "  model: \"local/llama3\"     # Local model");
+    }
+
+    if (string.IsNullOrEmpty(config.Provider))
+    {
+        // Extract provider from model specification if available
+        var extractedProvider = ExtractProviderFromModel(config.Model);
+        if (string.IsNullOrEmpty(extractedProvider))
+        {
+            throw new InvalidOperationException(
+                $"AI provider not specified and cannot be inferred from model '{config.Model}'. " +
+                "Please specify provider in configuration or use provider/model format: 'openai/gpt-4'");
+        }
+        config.Provider = extractedProvider;
+    }
+
+    var supportedProviders = new[] { "openai", "github", "azure", "anthropic", "local", "ollama" };
+    if (!supportedProviders.Contains(config.Provider.ToLowerInvariant()))
+    {
+        throw new InvalidOperationException(
+            $"Unknown AI provider: '{config.Provider}'. " +
+            $"Supported providers: {string.Join(", ", supportedProviders)}. " +
+            "Please specify a valid provider in workflow frontmatter or configuration.");
+    }
+}
+```
+
+**No Fallback Policy:**
+- **Model**: Must be explicitly specified in workflow frontmatter, project config, or global config
+- **Provider**: Must be specified or inferrable from model format (e.g., "openai/gpt-4")
+- **Error Messages**: Provide clear guidance on how to specify missing configuration
+- **Validation**: Occurs during workflow loading, before AI service initialization
+
 ## Environment Variable Support
 
 Environment variables that can override configuration settings:
-- `DOTNET_PROMPT_PROVIDER`: Default AI provider
+- `DOTNET_PROMPT_PROVIDER`: Default AI provider (still requires explicit model specification)
 - `DOTNET_PROMPT_VERBOSE`: Enable verbose logging
 - Additional environment variables to be defined
+
+**Note**: Environment variables can provide default providers but cannot provide fallback models. Model specification remains required.
 
 ## Configuration Merging Logic
 

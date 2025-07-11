@@ -36,17 +36,21 @@ Unique identifier for the workflow. Used for progress tracking and logging.
 name: "project-analysis-workflow"
 ```
 
-#### `model` (string)
-AI model to use for this workflow. Supported formats:
-- `"gpt-4o"` - GitHub Models (recommended)
+#### `model` (string) **REQUIRED**
+AI model to use for this workflow. **This field is required - no fallback defaults are provided.**
+
+Supported formats:
+- `"gpt-4o"` - GitHub Models (uses default provider)
 - `"openai/gpt-4"` - OpenAI 
 - `"azure/gpt-4"` - Azure OpenAI
 - `"anthropic/claude-3-sonnet"` - Anthropic
-- `"local/model-name"` - Local models
+- `"local/model-name"` - Local models (Ollama, etc.)
 
 ```yaml
-model: "gpt-4o"
+model: "gpt-4o"  # REQUIRED - no fallback if omitted
 ```
+
+**Important:** If no model is specified, the workflow will fail with an error message. There are no default fallbacks.
 
 ### Optional Core Fields
 
@@ -367,11 +371,13 @@ dotnet prompt validate my-workflow.prompt.md --check-dependencies
 
 ### Common Pitfalls
 
-1. **Missing Required Fields**: Always include `name` and `model`
+1. **Missing Required Fields**: Always include `name` and `model` - **no fallback defaults are provided**
 2. **Invalid Tool Names**: Use exact tool names from the available list
 3. **Circular Dependencies**: Avoid circular references in sub-workflows
 4. **Overly Complex Instructions**: Break complex workflows into sub-workflows
 5. **Missing Parameter Descriptions**: Always describe input parameters
+6. **Unknown Providers**: Use only supported providers (openai, github, azure, anthropic, local, ollama)
+7. **Missing Model Specification**: Workflows will fail if model is not explicitly specified
 
 ## Migration from Other Formats
 
