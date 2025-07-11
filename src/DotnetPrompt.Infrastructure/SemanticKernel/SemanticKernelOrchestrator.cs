@@ -215,8 +215,37 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                     // Create template to validate syntax (will throw if invalid)
                     var template = _handlebarsFactory.Create(promptConfig);
                     
+                    // Extract configuration for validation (same as execution)
+                    Dictionary<string, object>? providerConfig = null;
+                    string? validationProviderName = null;
+                    
+                    if (context.Configuration != null)
+                    {
+                        validationProviderName = context.Configuration.DefaultProvider;
+                        var model = context.Configuration.DefaultModel;
+                        
+                        if (!string.IsNullOrEmpty(model))
+                        {
+                            providerConfig = new Dictionary<string, object> { ["Model"] = model };
+                            
+                            // Add provider-specific configuration if available
+                            if (!string.IsNullOrEmpty(validationProviderName) && 
+                                context.Configuration.Providers.TryGetValue(validationProviderName, out var provider))
+                            {
+                                if (!string.IsNullOrEmpty(provider.ApiKey))
+                                    providerConfig["ApiKey"] = provider.ApiKey;
+                                if (!string.IsNullOrEmpty(provider.Token))
+                                    providerConfig["Token"] = provider.Token;
+                                if (!string.IsNullOrEmpty(provider.Endpoint))
+                                    providerConfig["Endpoint"] = provider.Endpoint;
+                                if (!string.IsNullOrEmpty(provider.BaseUrl))
+                                    providerConfig["BaseUrl"] = provider.BaseUrl;
+                            }
+                        }
+                    }
+                    
                     // Test render to validate variable references
-                    await template.RenderAsync(_kernel ?? await _kernelFactory.CreateKernelWithWorkflowAsync(workflow), kernelArgs, cancellationToken);
+                    await template.RenderAsync(_kernel ?? await _kernelFactory.CreateKernelWithWorkflowAsync(workflow, null, validationProviderName, providerConfig), kernelArgs, cancellationToken);
                     
                     _logger.LogDebug("SK Handlebars template validation passed");
                 }
@@ -246,7 +275,36 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
             {
                 try
                 {
-                    _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow);
+                    // Extract configuration for advanced validation (same as execution)
+                    Dictionary<string, object>? advancedProviderConfig = null;
+                    string? advancedProviderName = null;
+                    
+                    if (context.Configuration != null)
+                    {
+                        advancedProviderName = context.Configuration.DefaultProvider;
+                        var model = context.Configuration.DefaultModel;
+                        
+                        if (!string.IsNullOrEmpty(model))
+                        {
+                            advancedProviderConfig = new Dictionary<string, object> { ["Model"] = model };
+                            
+                            // Add provider-specific configuration if available
+                            if (!string.IsNullOrEmpty(advancedProviderName) && 
+                                context.Configuration.Providers.TryGetValue(advancedProviderName, out var provider))
+                            {
+                                if (!string.IsNullOrEmpty(provider.ApiKey))
+                                    advancedProviderConfig["ApiKey"] = provider.ApiKey;
+                                if (!string.IsNullOrEmpty(provider.Token))
+                                    advancedProviderConfig["Token"] = provider.Token;
+                                if (!string.IsNullOrEmpty(provider.Endpoint))
+                                    advancedProviderConfig["Endpoint"] = provider.Endpoint;
+                                if (!string.IsNullOrEmpty(provider.BaseUrl))
+                                    advancedProviderConfig["BaseUrl"] = provider.BaseUrl;
+                            }
+                        }
+                    }
+                    
+                    _kernel ??= await _kernelFactory.CreateKernelWithWorkflowAsync(workflow, null, advancedProviderName, advancedProviderConfig);
                     
                     // Validate available functions in kernel
                     var availableFunctions = _kernel.Plugins.GetFunctionsMetadata();
