@@ -77,7 +77,7 @@ Every dotnet-prompt workflow has two parts:
 ```yaml
 ---
 name: "workflow-identifier"        # Unique name for this workflow
-model: "gpt-4o"                   # AI model to use
+model: "gpt-4o"                   # AI model to use - REQUIRED, no fallbacks
 tools: ["tool1", "tool2"]         # Available tools for this workflow
 
 config:                           # Model-specific settings
@@ -85,6 +85,8 @@ config:                           # Model-specific settings
   maxOutputTokens: 2000           # Response length limit
 ---
 ```
+
+**⚠️ Important**: The `model` field is **required**. If not specified, the workflow will fail with an error message. There are no default fallbacks.
 
 ### 2. Markdown Content (Instructions)
 ```markdown
@@ -94,6 +96,25 @@ Clear instructions for what you want the AI to accomplish.
 
 Use natural language to describe your goals and requirements.
 The AI will use the available tools to complete the tasks.
+```
+
+## Common Error Messages
+
+If you forget to specify required configuration, you'll see helpful error messages:
+
+```bash
+# Missing model specification
+$ dotnet prompt run workflow-without-model.prompt.md
+Error: Model specification is required. Please specify a model in workflow frontmatter:
+  model: "gpt-4o"           # GitHub Models
+  model: "openai/gpt-4"     # OpenAI
+  model: "azure/gpt-4"      # Azure OpenAI
+
+# Unknown provider
+$ dotnet prompt run workflow-bad-provider.prompt.md  
+Error: Unknown AI provider: 'invalid-provider'. 
+Supported providers: openai, github, azure, anthropic, local, ollama.
+Please specify a valid provider in workflow frontmatter or configuration.
 ```
 ## Next Steps
 

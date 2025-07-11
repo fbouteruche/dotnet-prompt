@@ -202,10 +202,11 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 errors.Add("Workflow content cannot be empty");
             }
 
-            // 2. Validate frontmatter configuration
+            // 2. Validate frontmatter configuration - MODEL REQUIRED
             if (string.IsNullOrEmpty(workflow.Model))
             {
-                warnings.Add("No model specified in frontmatter, will use default");
+                errors.Add("Model specification is required. No fallback defaults are provided. " +
+                          "Please specify a model in workflow frontmatter (e.g., model: \"gpt-4o\")");
             }
 
             // 3. Validate Handlebars template syntax
@@ -232,9 +233,17 @@ public class SemanticKernelOrchestrator : IWorkflowOrchestrator
                 }
             }
 
-            // 4. Validate provider configuration
-            var providerName = ExtractProviderFromModel(workflow.Model) ?? "openai";
-            if (!IsProviderConfigured(providerName))
+            // 4. Validate provider configuration - NO FALLBACKS
+            var providerName = ExtractProviderFromModel(workflow.Model) ?? "unknown";
+            var supportedProviders = new[] { "openai", "github", "azure", "anthropic", "local", "ollama" };
+            
+            if (providerName == "unknown" || !supportedProviders.Contains(providerName.ToLowerInvariant()))
+            {
+                errors.Add($"Unknown or unsupported AI provider: '{providerName}'. " +
+                          $"Supported providers: {string.Join(", ", supportedProviders)}. " +
+                          "Please specify a valid provider in workflow frontmatter or use provider/model format.");
+            }
+            else if (!IsProviderConfigured(providerName))
             {
                 warnings.Add($"AI provider '{providerName}' may not be properly configured");
             }
