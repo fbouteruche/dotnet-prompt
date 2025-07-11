@@ -191,8 +191,10 @@ Error: Model specification is required. Please specify a model in workflow front
 
 3. **Check supported providers**:
    - `openai`, `github`, `azure`, `anthropic`, `local`, `ollama`
+   - If no provider is specified, defaults to `github`
+   - Unknown providers fail with no fallback
 
-**Important**: There are no fallback defaults. The model must be explicitly specified.
+**Important**: There are no fallback defaults for models. The model must be explicitly specified. However, if no provider is specified, it defaults to "github".
 
 #### Issue: Unknown AI provider
 ```

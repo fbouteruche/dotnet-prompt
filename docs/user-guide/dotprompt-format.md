@@ -37,10 +37,10 @@ name: "project-analysis-workflow"
 ```
 
 #### `model` (string) **REQUIRED**
-AI model to use for this workflow. **This field is required - no fallback defaults are provided.**
+AI model to use for this workflow. **This field is required - no fallback defaults are provided for models.**
 
 Supported formats:
-- `"gpt-4o"` - GitHub Models (uses default provider)
+- `"gpt-4o"` - Uses default provider (defaults to "github" if no provider configured)
 - `"openai/gpt-4"` - OpenAI 
 - `"azure/gpt-4"` - Azure OpenAI
 - `"anthropic/claude-3-sonnet"` - Anthropic
@@ -50,7 +50,10 @@ Supported formats:
 model: "gpt-4o"  # REQUIRED - no fallback if omitted
 ```
 
-**Important:** If no model is specified, the workflow will fail with an error message. There are no default fallbacks.
+**Important:** 
+- Model specification is required - workflows will fail if no model is specified
+- Provider defaults to "github" if not specified 
+- Unknown providers cause errors with no fallback
 
 ### Optional Core Fields
 
@@ -371,13 +374,14 @@ dotnet prompt validate my-workflow.prompt.md --check-dependencies
 
 ### Common Pitfalls
 
-1. **Missing Required Fields**: Always include `name` and `model` - **no fallback defaults are provided**
+1. **Missing Required Model**: Always include `model` - **no fallback defaults are provided for models**
 2. **Invalid Tool Names**: Use exact tool names from the available list
 3. **Circular Dependencies**: Avoid circular references in sub-workflows
 4. **Overly Complex Instructions**: Break complex workflows into sub-workflows
 5. **Missing Parameter Descriptions**: Always describe input parameters
-6. **Unknown Providers**: Use only supported providers (openai, github, azure, anthropic, local, ollama)
+6. **Unknown Providers**: Use only supported providers (openai, github, azure, anthropic, local, ollama) - **unknown providers fail with no fallback**
 7. **Missing Model Specification**: Workflows will fail if model is not explicitly specified
+8. **Assuming Provider Defaults**: While provider defaults to "github" if not specified, be explicit for clarity
 
 ## Migration from Other Formats
 

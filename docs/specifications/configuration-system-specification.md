@@ -99,8 +99,10 @@ public class DotNetPromptConfiguration
             config.Provider = cliProvider;
         }
         
-        // NO FALLBACKS: Model and provider must be explicitly specified
-        // If not provided through the hierarchy, execution will fail with clear error messages
+        // FALLBACK BEHAVIOR:
+        // - Model: NO FALLBACK - must be explicitly specified or execution fails
+        // - Provider: DEFAULT FALLBACK to "github" if not specified
+        // - Unknown providers: NO FALLBACK - execution fails with error
         
         return config;
     }
@@ -393,19 +395,20 @@ public static void ValidateRequiredConfiguration(PromptConfiguration config)
 ```
 
 **No Fallback Policy:**
-- **Model**: Must be explicitly specified in workflow frontmatter, project config, or global config
-- **Provider**: Must be specified or inferrable from model format (e.g., "openai/gpt-4")
+- **Model**: Must be explicitly specified in workflow frontmatter, project config, or global config - no fallback defaults
+- **Provider**: Defaults to "github" if not specified anywhere in the configuration hierarchy
+- **Unknown Providers**: Fail with clear error messages listing supported providers
 - **Error Messages**: Provide clear guidance on how to specify missing configuration
 - **Validation**: Occurs during workflow loading, before AI service initialization
 
 ## Environment Variable Support
 
 Environment variables that can override configuration settings:
-- `DOTNET_PROMPT_PROVIDER`: Default AI provider (still requires explicit model specification)
+- `DOTNET_PROMPT_PROVIDER`: Default AI provider (falls back to "github" if not specified)
 - `DOTNET_PROMPT_VERBOSE`: Enable verbose logging
 - Additional environment variables to be defined
 
-**Note**: Environment variables can provide default providers but cannot provide fallback models. Model specification remains required.
+**Note**: Environment variables can provide default providers, and if no provider is specified anywhere, the system defaults to "github". Model specification remains required with no fallback defaults.
 
 ## Configuration Merging Logic
 
