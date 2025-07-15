@@ -181,12 +181,12 @@ public class ConfigurationService : IConfigurationService
     public virtual string GetGlobalConfigurationPath()
     {
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(userProfile, ".dotnet-prompt", "config.yaml");
+        return Path.Combine(userProfile, ".dotnet-prompt", "config.json");
     }
 
     public virtual string GetProjectConfigurationPath(string projectPath)
     {
-        return Path.Combine(projectPath, "dotnet-prompt.yaml");
+        return Path.Combine(projectPath, ".dotnet-prompt", "config.json");
     }
 
     private void LoadConfigurationFile(IConfigurationBuilder builder, string filePath, string configType)
