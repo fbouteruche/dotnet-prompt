@@ -46,17 +46,22 @@ public class WorkflowService : IWorkflowService
             var workflow = await _parser.ParseFileAsync(workflowFilePath, cancellationToken);
             
             // Load configuration with workflow model
-            var projectPath = Path.GetDirectoryName(workflowFilePath);
+            // Use the working directory (context or current directory) for local configuration resolution
+            // This ensures consistent behavior regardless of workflow file location
+            var workingDirectory = !string.IsNullOrEmpty(options.Context) 
+                ? Path.GetFullPath(options.Context) 
+                : Environment.CurrentDirectory;
+            
             var configuration = await _configurationService.LoadConfigurationAsync(
                 workflowModel: workflow.Model,
-                projectPath: projectPath,
+                projectPath: workingDirectory,
                 cancellationToken: cancellationToken);
             
             // Create execution context with configuration
             var context = new WorkflowExecutionContext
             {
                 Options = options,
-                WorkingDirectory = projectPath ?? Environment.CurrentDirectory,
+                WorkingDirectory = workingDirectory,
                 Configuration = configuration
             };
 
@@ -109,16 +114,18 @@ public class WorkflowService : IWorkflowService
             var workflow = await _parser.ParseFileAsync(workflowFilePath, cancellationToken);
             
             // Load configuration with workflow model for validation
-            var projectPath = Path.GetDirectoryName(workflowFilePath);
+            // Use working directory for local configuration resolution
+            // This ensures consistent behavior regardless of workflow file location
+            var workingDirectory = Environment.CurrentDirectory;
             var configuration = await _configurationService.LoadConfigurationAsync(
                 workflowModel: workflow.Model,
-                projectPath: projectPath,
+                projectPath: workingDirectory,
                 cancellationToken: cancellationToken);
             
             // Create execution context for validation with configuration
             var context = new WorkflowExecutionContext
             {
-                WorkingDirectory = projectPath ?? Environment.CurrentDirectory,
+                WorkingDirectory = workingDirectory,
                 Configuration = configuration
             };
 

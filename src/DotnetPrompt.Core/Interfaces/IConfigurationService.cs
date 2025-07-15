@@ -15,7 +15,7 @@ public interface IConfigurationService
     /// <param name="cliModel">Model specified via CLI argument</param>
     /// <param name="cliVerbose">Verbose flag from CLI</param>
     /// <param name="cliConfigFile">Custom config file path from CLI</param>
-    /// <param name="projectPath">Project directory path</param>
+    /// <param name="projectPath">Working directory path for local configuration</param>
     /// <param name="workflowModel">Model specification from workflow frontmatter</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Resolved configuration</returns>
@@ -40,7 +40,7 @@ public interface IConfigurationService
     /// </summary>
     /// <param name="configuration">Configuration to save</param>
     /// <param name="isGlobal">Whether to save as global configuration</param>
-    /// <param name="projectPath">Project path for project configuration</param>
+    /// <param name="projectPath">Working directory path for local configuration</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task SaveConfigurationAsync(
         DotPromptConfiguration configuration,
@@ -62,8 +62,8 @@ public interface IConfigurationService
     string GetGlobalConfigurationPath();
 
     /// <summary>
-    /// Gets project configuration file path
+    /// Gets local configuration file path for working directory
     /// </summary>
-    /// <param name="projectPath">Project directory path</param>
+    /// <param name="projectPath">Working directory path</param>
     string GetProjectConfigurationPath(string projectPath);
 }

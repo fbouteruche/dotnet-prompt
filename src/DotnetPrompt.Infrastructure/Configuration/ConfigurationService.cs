@@ -250,7 +250,21 @@ public class ConfigurationService : IConfigurationService
         foreach (var providerSection in providersSection.GetChildren())
         {
             var providerConfig = new ProviderConfiguration();
-            providerSection.Bind(providerConfig);
+            
+            // Manual binding to handle snake_case to PascalCase property mapping
+            providerConfig.ApiKey = providerSection["api_key"];
+            providerConfig.BaseUrl = providerSection["base_url"];
+            providerConfig.Endpoint = providerSection["endpoint"];
+            providerConfig.Deployment = providerSection["deployment"];
+            providerConfig.Token = providerSection["token"];
+            providerConfig.ApiVersion = providerSection["api_version"];
+            
+            if (int.TryParse(providerSection["timeout"], out var providerTimeout))
+                providerConfig.Timeout = providerTimeout;
+                
+            if (int.TryParse(providerSection["max_retries"], out var maxRetries))
+                providerConfig.MaxRetries = maxRetries;
+            
             dotPromptConfig.Providers[providerSection.Key] = providerConfig;
         }
 
