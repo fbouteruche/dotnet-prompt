@@ -101,7 +101,7 @@ dotnet prompt resume workflow.prompt.md --progress ./custom-progress.md
 #### 3.3.2 Model Configuration Hierarchy
 1. **CLI Provider Override**: `--provider` flag specifies runtime provider
 2. **Frontmatter Model**: `model:` field in workflow YAML frontmatter
-3. **Project Configuration**: `.dotnet-prompt/config.json` in project root
+3. **Local Configuration**: `.dotnet-prompt/config.json` in working directory
 4. **Global Configuration**: `~/.dotnet-prompt/config.json` in user profile
 
 #### 3.3.3 Provider Resolution Logic
@@ -151,10 +151,10 @@ dotnet prompt resume workflow.prompt.md --progress ./custom-progress.md
 }
 ```
 
-#### 3.5.2 Project Configuration (`.dotnet-prompt/`)
-- `mcp.json`: Generated MCP server configurations
-- `config.json`: Project-specific overrides for providers and models
-- Workflow template storage for project-specific reusable workflows
+#### 3.5.2 Local Configuration (`.dotnet-prompt/`)
+- `mcp.json`: Generated MCP server configurations  
+- `config.json`: Local overrides for providers and models in working directory
+- Workflow template storage for directory-specific reusable workflows
 
 #### 3.5.3 Workflow Configuration (Frontmatter)
 ```yaml

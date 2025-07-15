@@ -319,9 +319,9 @@ dotnet prompt validate workflow.prompt.md --check-parameter-usage
 
 ### Standard Directory Structure
 ```
-project-root/
+working-directory/
 ├── .dotnet-prompt/
-│   ├── config.json          # Project configuration
+│   ├── config.json          # Local configuration
 │   ├── mcp.json             # MCP server definitions
 │   └── progress/            # Progress files
 ├── workflows/

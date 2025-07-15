@@ -8,7 +8,7 @@ dotnet-prompt uses a hierarchical configuration system where settings are merged
 
 1. **CLI Arguments** (highest priority)
 2. **Workflow Frontmatter** 
-3. **Project Configuration** (`.dotnet-prompt/config.json`)
+3. **Local Configuration** (`.dotnet-prompt/config.json`)
 4. **Global Configuration** (`~/.dotnet-prompt/config.json`)
 5. **Default Values** (lowest priority)
 
@@ -19,7 +19,7 @@ dotnet-prompt uses a hierarchical configuration system where settings are merged
 ~/.dotnet-prompt/config.json
 ```
 
-### Project Configuration
+### Local Configuration
 ```
 .dotnet-prompt/config.json
 ./config/dotnet-prompt.json

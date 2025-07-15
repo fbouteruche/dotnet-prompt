@@ -13,7 +13,7 @@ The tool uses a hierarchical configuration system with the following precedence 
 
 1. **CLI Arguments** (`--provider`, `--verbose`, etc.)
 2. **Workflow Frontmatter** (YAML configuration in .prompt.md files)
-3. **Project Configuration** (`.dotnet-prompt/config.json` in project root)
+3. **Local Configuration** (`.dotnet-prompt/config.json` in working directory)
 4. **Global Configuration** (`~/.dotnet-prompt/config.json` in user profile)
 5. **Default Values** (Built-in defaults)
 
@@ -35,7 +35,7 @@ public class DotNetPromptConfiguration
         IKernelBuilder kernelBuilder,         // SK kernel builder for DI integration
         string? cliProvider = null,           // 1. CLI --provider override
         string? frontmatterModel = null,      // 2. Workflow frontmatter model
-        string? projectPath = null,           // 3. Project .dotnet-prompt/config.json
+        string? localPath = null,           // 3. Local .dotnet-prompt/config.json
         CancellationToken cancellationToken = default)  // 4. Global ~/.dotnet-prompt/config.json
     {
         var config = new PromptConfiguration();
@@ -56,10 +56,10 @@ public class DotNetPromptConfiguration
             await ApplySemanticKernelGlobalSettings(kernelBuilder, globalConfig);
         }
         
-        // 3. Override with project configuration
-        if (!string.IsNullOrEmpty(projectPath))
+        // 3. Override with local configuration (working directory)
+        if (!string.IsNullOrEmpty(localPath))
         {
-            var projectConfigPath = Path.Combine(projectPath, ".dotnet-prompt", "config.json");
+            var localConfigPath = Path.Combine(localPath, ".dotnet-prompt", "config.json");
             if (File.Exists(projectConfigPath))
             {
                 var projectConfig = await JsonSerializer.DeserializeAsync<ProjectConfiguration>(
@@ -325,7 +325,7 @@ public static class KernelBuilderExtensions
 }
 ```
 
-### Project Configuration (`.dotnet-prompt/config.json`)
+### Local Configuration (`.dotnet-prompt/config.json`)
 ```json
 {
   "default_provider": "azure",
@@ -450,10 +450,50 @@ How configuration values are resolved and merged across the hierarchy.
 - How should deprecated configuration options be handled?
 - What happens when required configuration is missing?
 
-### 6. Project-Specific Configuration
+### 6. Local Configuration
 - What configuration should be project-specific vs global?
 - How should team-shared configuration work?
-- Should project configuration be version controlled?
+- Should local configuration be version controlled?
+
+## Working Directory Configuration Discovery
+
+### Discovery Strategy
+The tool loads configuration from a **working directory** basis, not a "project root" concept:
+
+1. **Working Directory Determination**:
+   - If `--context <path>` is specified, use that directory as working directory
+   - Otherwise, use the current directory where `dotnet prompt` command is executed
+   - The workflow file location does NOT affect configuration loading
+
+2. **Local Configuration Search**:
+   - Look for `.dotnet-prompt/config.json` in the working directory
+   - If found, load and merge with global configuration
+   - If not found, skip local configuration layer
+
+3. **Examples**:
+   ```bash
+   # Working directory: /home/user/myproject
+   # Looks for: /home/user/myproject/.dotnet-prompt/config.json
+   dotnet prompt run ./workflows/analyze.prompt.md
+   
+   # Working directory: /home/user/myproject/src (specified by --context)
+   # Looks for: /home/user/myproject/src/.dotnet-prompt/config.json
+   dotnet prompt run ./workflows/analyze.prompt.md --context ./src
+   
+   # Working directory: /home/user/myproject (current directory)
+   # Looks for: /home/user/myproject/.dotnet-prompt/config.json
+   # Workflow file location ./subdir/workflow.prompt.md does NOT affect config search
+   dotnet prompt run ./subdir/workflow.prompt.md
+   ```
+
+### Rationale
+- **Consistent Behavior**: Configuration loading is independent of workflow file location
+- **User Control**: Users explicitly control the working context via `--context` or current directory
+- **No Magic**: No upward directory searching or "project root" guessing
+- **Predictable**: Same configuration behavior regardless of where workflow files are stored
+
+### Open Questions for Future Implementation
+- Should local configuration be version controlled?
 - How should configuration inheritance work in monorepos?
 - What configuration should be discoverable vs explicit?
 
@@ -472,7 +512,6 @@ How configuration values are resolved and merged across the hierarchy.
 
 ### 9. Configuration File Discovery
 - How should the tool discover configuration files?
-- What is the search strategy for project configuration?
 - Should there be support for configuration file templates?
 - How should configuration file conflicts be resolved?
 
