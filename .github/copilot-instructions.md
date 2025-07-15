@@ -1,33 +1,67 @@
 # GitHub Copilot Instructions for dotnet-prompt
 
+## ⚠️ CRITICAL: Specification Adherence Policy
+
+**THE SPECIFICATIONS ARE THE SINGLE SOURCE OF TRUTH**
+
+Before implementing ANY code changes or architectural decisions, you MUST:
+
+1. **Reference the Authoritative Documentation**:
+   - [`docs/architecture.md`](../docs/architecture.md) - Complete architectural patterns and design decisions
+   - [`docs/requirements.md`](../docs/requirements.md) - Product requirements and functional specifications  
+   - [`docs/specifications/`](../docs/specifications/) - Detailed technical specifications for all components:
+     - [`builtin-tools-api-specification.md`](../docs/specifications/builtin-tools-api-specification.md)
+     - [`cli-interface-specification.md`](../docs/specifications/cli-interface-specification.md)
+     - [`configuration-system-specification.md`](../docs/specifications/configuration-system-specification.md)
+     - [`error-handling-logging-specification.md`](../docs/specifications/error-handling-logging-specification.md)
+     - [`mcp-integration-specification.md`](../docs/specifications/mcp-integration-specification.md)
+     - [`sub-workflow-composition-specification.md`](../docs/specifications/sub-workflow-composition-specification.md)
+     - [`workflow-format-specification.md`](../docs/specifications/workflow-format-specification.md)
+     - [`workflow-orchestrator-specification.md`](../docs/specifications/workflow-orchestrator-specification.md)
+     - [`workflow-resume-system-specification.md`](../docs/specifications/workflow-resume-system-specification.md)
+
+2. **Validate Against Specifications**: If a user request conflicts with established specifications:
+   - **STOP** and inform the user of the conflict
+   - **REFERENCE** the specific specification(s) that conflict
+   - **REQUEST** explicit confirmation to proceed with specification changes
+   - **EXAMPLE**: "This request conflicts with the CLI Interface Specification (docs/specifications/cli-interface-specification.md) which defines... Do you want me to update the specification first?"
+
+3. **Maintain Specification Consistency**: When user confirms changes that conflict with specifications:
+   - **FIRST** update the relevant specification files in `docs/specifications/`
+   - **THEN** update `docs/architecture.md` and `docs/requirements.md` if needed
+   - **FINALLY** implement the code changes aligned with updated specifications
+   - **VERIFY** all specification cross-references remain consistent
+
+4. **Code-Specification Alignment Rule**: 
+   - **All generated code MUST align with current specifications**
+   - **Specifications are updated BEFORE code implementation**
+   - **No exceptions to this rule - specifications drive implementation**
+
 ## Project Overview
 
 dotnet-prompt is a CLI tool for .NET developers to execute AI-powered workflows using markdown files with YAML frontmatter. The project follows Clean Architecture principles with comprehensive Microsoft Semantic Kernel integration.
 
+**For complete project details, see [`docs/requirements.md`](../docs/requirements.md) and [`docs/architecture.md`](../docs/architecture.md)**.
+
 ## Core Architecture Principles
 
-### 1. Semantic Kernel First Approach
-- **Always use Semantic Kernel (SK) patterns** for AI orchestration, function calling, and conversation management
-- **Leverage Microsoft.Extensions.AI** for unified provider abstractions instead of custom implementations
-- **Use SK plugins** for all tool implementations (built-in and MCP)
-- **Apply SK filters and middleware** for cross-cutting concerns (error handling, logging, performance)
-- **Utilize SK Vector Stores** for caching, memory, and conversation persistence
+**Complete architectural guidance is defined in [`docs/architecture.md`](../docs/architecture.md)**
 
-### 2. Clean Architecture Layers
-```
-CLI Layer (DotnetPrompt.Cli)
-├── Application Layer (DotnetPrompt.Application) - SK orchestration
-├── Domain Layer (DotnetPrompt.Core) - Pure business logic
-└── Infrastructure Layer (DotnetPrompt.Infrastructure) - SK services
-```
+### Key Principles Summary (see architecture.md for full details):
 
-### 3. Dependency Injection Patterns
-- Use `Microsoft.Extensions.DependencyInjection` throughout
-- Register SK services with proper scoping (singleton for kernels, scoped for execution)
-- Inject `IKernel`, `IChatCompletionService`, and SK abstractions
-- Use configuration pattern with `IOptions<T>` for settings
+1. **Semantic Kernel First Approach** - Always use SK patterns for AI orchestration
+2. **Clean Architecture Layers** - Strict separation between CLI, Application, Domain, and Infrastructure
+3. **Microsoft.Extensions.AI Integration** - Unified provider abstractions
+4. **File-Based Progress Management** - Resume functionality via progress files
+
+### Architecture Validation Checklist:
+- ✅ Does this follow the layer separation defined in `docs/architecture.md`?
+- ✅ Does this use SK patterns as specified in the architecture?
+- ✅ Does this align with the technology stack in `docs/architecture.md`?
 
 ## CLI Output Patterns
+
+**Complete CLI output and error handling patterns are specified in [`docs/specifications/error-handling-logging-specification.md`](../docs/specifications/error-handling-logging-specification.md)**
 
 ### Hybrid Logging Architecture (Industry Standard)
 
@@ -43,66 +77,7 @@ _logger.LogInformation("Workflow completed successfully in {ExecutionTime}", res
 _logger.LogError("Workflow execution failed: {ErrorMessage}", result.ErrorMessage);
 ```
 
-### CLI Output Design Principles
-
-**User-Facing Output (Console.WriteLine/Error.WriteLine):**
-- **Primary user interface** - Direct communication with CLI users
-- **Machine parseable** - Scripts and automation can capture and process output
-- **Immediate feedback** - Appears instantly without formatting overhead
-- **Exit code correlation** - Error messages directly correlate with exit codes
-- **Pipeline compatible** - Works correctly with stdout/stderr redirection
-
-**Structured Logging (ILogger):**
-- **Operational observability** - Debugging, monitoring, troubleshooting
-- **Structured data** - Correlation IDs, timing, context enrichment
-- **Configurable output** - Can be redirected to files, external sinks
-- **Development insights** - Verbose mode, detailed execution traces
-
-### Command Implementation Pattern
-
-```csharp
-public async Task<int> ExecuteAsync(RunOptions options)
-{
-    try
-    {
-        // Structured logging for operations
-        _logger.LogInformation("Executing workflow: {WorkflowFile}", options.WorkflowFile);
-        
-        var result = await _workflowService.ExecuteAsync(options.WorkflowFile, executionOptions);
-        
-        if (result.Success)
-        {
-            // User-facing success output
-            if (!string.IsNullOrEmpty(result.Output))
-            {
-                Console.WriteLine(result.Output);  // ✅ User sees this
-            }
-            
-            // Structured logging for telemetry
-            _logger.LogInformation("Workflow completed successfully in {ExecutionTime}", result.ExecutionTime);
-            return ExitCodes.Success;
-        }
-        else
-        {
-            // User-facing error output
-            Console.Error.WriteLine($"Error: {result.ErrorMessage}");  // ✅ User sees this
-            
-            // Structured logging for debugging
-            _logger.LogError("Workflow execution failed: {ErrorMessage}", result.ErrorMessage);
-            return ExitCodes.GeneralError;
-        }
-    }
-    catch (FileNotFoundException ex)
-    {
-        // User-facing error
-        Console.Error.WriteLine($"Error: Workflow file not found - {ex.Message}");  // ✅ User sees this
-        
-        // Structured logging
-        _logger.LogError(ex, "Workflow file not found");  // ✅ Ops team sees this
-        return ExitCodes.GeneralError;
-    }
-}
-```
+**Refer to the Error Handling & Logging Specification for complete implementation patterns and requirements.**
 
 ## Code Generation Guidelines
 
@@ -139,6 +114,8 @@ public class ProjectAnalysisPlugin
 
 ### Configuration Management
 
+**Complete configuration system specification is defined in [`docs/specifications/configuration-system-specification.md`](../docs/specifications/configuration-system-specification.md)**
+
 Use hierarchical configuration with proper typing:
 
 ```csharp
@@ -156,6 +133,8 @@ public ProjectAnalysisPlugin(IOptions<ProjectAnalysisOptions> options)
     _options = options.Value;
 }
 ```
+
+**Refer to the Configuration System Specification for the complete 4-level hierarchy, provider resolution logic, and configuration file schemas.**
 
 ### Error Handling with SK Filters
 
@@ -244,6 +223,8 @@ public class WorkflowExecutionFilter : IFunctionInvocationFilter
 
 ## Workflow File Format
 
+**Complete workflow format specification is defined in [`docs/specifications/workflow-format-specification.md`](../docs/specifications/workflow-format-specification.md)**
+
 When generating workflow examples or parsing logic, follow dotprompt specification:
 
 ```yaml
@@ -271,7 +252,11 @@ dotnet-prompt.sub-workflows:
 Analyze the project and generate documentation...
 ```
 
+**Refer to the Workflow Format Specification for complete YAML schema, validation rules, and extension patterns.**
+
 ## Built-in Tools Standards
+
+**Complete built-in tools API specification is defined in [`docs/specifications/builtin-tools-api-specification.md`](../docs/specifications/builtin-tools-api-specification.md)**
 
 ### Tool Implementation Pattern
 ```csharp
@@ -305,6 +290,8 @@ public class ToolResponse<T>
     public Dictionary<string, object> Metadata { get; set; } = new();
 }
 ```
+
+**Refer to the Built-in Tools API Specification for complete interface definitions, error handling patterns, and tool registration requirements.**
 
 ## Testing Patterns
 
@@ -428,6 +415,7 @@ activity?.SetTag("project.path", projectPath);
 ### Configuration Hierarchy
 ```csharp
 // Respect the 4-level hierarchy: CLI → Frontmatter → Project → Global
+// Complete hierarchy defined in docs/specifications/configuration-system-specification.md
 public static PromptConfiguration ResolveConfiguration(
     string? cliProvider = null,           // 1. CLI override
     string? frontmatterModel = null,      // 2. Workflow frontmatter  
