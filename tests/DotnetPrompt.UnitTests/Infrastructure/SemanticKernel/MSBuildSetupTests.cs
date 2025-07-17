@@ -1,5 +1,7 @@
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using Microsoft.Build.Locator;
+using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 
 namespace DotnetPrompt.UnitTests.Infrastructure.SemanticKernel;
@@ -30,6 +32,17 @@ public class MSBuildSetupTests
         
         // Should still be initialized
         Assert.True(MSBuildSetup.IsInitialized);
+    }
+    
+    [Fact]
+    public void MSBuildSetup_SetLogger_DoesNotThrow()
+    {
+        // Arrange
+        var mockLogger = new Mock<ILogger>();
+        
+        // Act & Assert - Should not throw
+        var exception = Record.Exception(() => MSBuildSetup.SetLogger(mockLogger.Object));
+        Assert.Null(exception);
     }
     
     [Fact]
