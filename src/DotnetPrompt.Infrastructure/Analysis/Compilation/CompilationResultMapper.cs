@@ -31,7 +31,8 @@ public static class CompilationResultMapper
             FallbackReason = fallbackReason,
             CompilationTimeMs = compilationTimeMs,
             TargetFramework = targetFramework,
-            Diagnostics = CreateDiagnosticsSummary(diagnostics)
+            Diagnostics = CreateDiagnosticsSummary(diagnostics),
+            Compilation = compilation // Set the compilation reference
         };
     }
 
@@ -89,7 +90,7 @@ public static class CompilationResultMapper
         {
             Kind = d.Kind.ToString(),
             Message = d.Message,
-            ProjectPath = d.ProjectId?.ToString()
+            ProjectPath = null // WorkspaceDiagnostic doesn't have ProjectId in current version
         }).ToList();
 
         return result;

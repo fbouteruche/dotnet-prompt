@@ -113,6 +113,18 @@ public class RoslynAnalysisResult
     /// </summary>
     [JsonPropertyName("performance")]
     public PerformanceMetrics Performance { get; set; } = new();
+    
+    /// <summary>
+    /// Execution time in milliseconds (compatibility property)
+    /// </summary>
+    [JsonPropertyName("execution_time_ms")]
+    public long ExecutionTimeMs { get; set; }
+    
+    /// <summary>
+    /// Metadata dictionary for compatibility with existing code
+    /// </summary>
+    [JsonPropertyName("metadata")]
+    public Dictionary<string, object> Metadata { get; set; } = new();
 }
 
 /// <summary>
@@ -193,6 +205,12 @@ public class CompilationInfo
     public DiagnosticCount DiagnosticCounts { get; set; } = new();
     
     /// <summary>
+    /// Total diagnostic count (compatibility property)
+    /// </summary>
+    [JsonPropertyName("diagnostic_count")]
+    public int DiagnosticCount { get; set; }
+    
+    /// <summary>
     /// Number of syntax trees
     /// </summary>
     [JsonPropertyName("syntax_tree_count")]
@@ -203,6 +221,30 @@ public class CompilationInfo
     /// </summary>
     [JsonPropertyName("referenced_assembly_count")]
     public int ReferencedAssemblyCount { get; set; }
+    
+    /// <summary>
+    /// Strategy used for compilation (compatibility property)
+    /// </summary>
+    [JsonPropertyName("strategy_used")]
+    public CompilationStrategy StrategyUsed { get; set; }
+    
+    /// <summary>
+    /// Whether fallback strategy was used (compatibility property)
+    /// </summary>
+    [JsonPropertyName("fallback_used")]
+    public bool FallbackUsed { get; set; }
+    
+    /// <summary>
+    /// Reason for fallback if used (compatibility property)
+    /// </summary>
+    [JsonPropertyName("fallback_reason")]
+    public string? FallbackReason { get; set; }
+    
+    /// <summary>
+    /// Compilation time in milliseconds (compatibility property)
+    /// </summary>
+    [JsonPropertyName("compilation_time_ms")]
+    public long CompilationTimeMs { get; set; }
 }
 
 /// <summary>
@@ -371,6 +413,12 @@ public class PackageReference
     /// </summary>
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Package type (compatibility property)
+    /// </summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "package";
     
     /// <summary>
     /// Package version
@@ -937,6 +985,12 @@ public class Recommendation
     public string Category { get; set; } = string.Empty;
     
     /// <summary>
+    /// Recommendation type (compatibility property)
+    /// </summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "recommendation";
+    
+    /// <summary>
     /// Priority level
     /// </summary>
     [JsonPropertyName("priority")]
@@ -1001,4 +1055,28 @@ public class PerformanceMetrics
     /// </summary>
     [JsonPropertyName("files_processed")]
     public int FilesProcessed { get; set; }
+    
+    /// <summary>
+    /// Total analysis time in milliseconds (compatibility property)
+    /// </summary>
+    [JsonPropertyName("total_analysis_time_ms")]
+    public long TotalAnalysisTimeMs { get; set; }
+    
+    /// <summary>
+    /// Semantic analysis time in milliseconds (compatibility property)
+    /// </summary>
+    [JsonPropertyName("semantic_analysis_time_ms")]
+    public long SemanticAnalysisTimeMs { get; set; }
+    
+    /// <summary>
+    /// Metrics calculation time in milliseconds (compatibility property)
+    /// </summary>
+    [JsonPropertyName("metrics_calculation_time_ms")]
+    public long MetricsCalculationTimeMs { get; set; }
+    
+    /// <summary>
+    /// Memory usage in MB (compatibility property)
+    /// </summary>
+    [JsonPropertyName("memory_usage_mb")]
+    public double MemoryUsageMB { get; set; }
 }

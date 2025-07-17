@@ -149,4 +149,29 @@ public class AnalysisCompilationOptions
     /// </summary>
     [JsonPropertyName("language_version")]
     public string? LanguageVersion { get; set; }
+    
+    /// <summary>
+    /// MSBuild workspace timeout in milliseconds (for compatibility with MSBuild operations)
+    /// </summary>
+    [JsonPropertyName("msbuild_timeout")]
+    [Range(1000, 300000, ErrorMessage = "MSBuild timeout must be between 1 second and 5 minutes")]
+    public int MSBuildTimeout { get; set; } = 30000;
+    
+    /// <summary>
+    /// Include test projects in compilation
+    /// </summary>
+    [JsonPropertyName("include_tests")]
+    public bool IncludeTests { get; set; } = true;
+    
+    /// <summary>
+    /// Fallback to custom compilation if MSBuild fails (compatibility property)
+    /// </summary>
+    [JsonPropertyName("fallback_to_custom")]
+    public bool FallbackToCustom { get; set; } = true;
+    
+    /// <summary>
+    /// Use lightweight custom compilation mode (compatibility property)
+    /// </summary>
+    [JsonPropertyName("lightweight_mode")]
+    public bool LightweightMode { get; set; } = false;
 }

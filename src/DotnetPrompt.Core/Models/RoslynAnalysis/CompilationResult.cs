@@ -75,6 +75,12 @@ public class CompilationResult
     public string? AssemblyName { get; set; }
     
     /// <summary>
+    /// Internal reference to the Roslyn compilation (for compatibility)
+    /// </summary>
+    [JsonIgnore]
+    public Microsoft.CodeAnalysis.Compilation? Compilation { get; set; }
+    
+    /// <summary>
     /// Default constructor
     /// </summary>
     public CompilationResult()
