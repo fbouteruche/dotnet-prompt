@@ -161,11 +161,15 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
                 0);
         }
         
-        return CompilationResultMapper.CreateSuccessResult(
+        return CompilationResultMapper.CreateSuccessResultWithMetadata(
             compilation,
+            targetProject,
             CompilationStrategy.MSBuild,
             0, // Will be set by caller
-            targetProject.AnalyzerConfigDocuments.FirstOrDefault()?.FilePath);
+            targetProject.AnalyzerConfigDocuments.FirstOrDefault()?.FilePath,
+            false,
+            null,
+            _logger);
     }
     
     private async Task<CompilationResult> HandleProjectAnalysis(
@@ -205,11 +209,15 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
         // Extract target framework from project properties
         var targetFramework = ExtractTargetFramework(project);
         
-        return CompilationResultMapper.CreateSuccessResult(
+        return CompilationResultMapper.CreateSuccessResultWithMetadata(
             compilation,
+            project,
             CompilationStrategy.MSBuild,
             0, // Will be set by caller
-            targetFramework);
+            targetFramework,
+            false,
+            null,
+            _logger);
     }
     
     private Project? SelectTargetProject(Solution solution, AnalysisCompilationOptions options)
@@ -435,11 +443,15 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
             return (result, null);
         }
         
-        var successResult = CompilationResultMapper.CreateSuccessResult(
+        var successResult = CompilationResultMapper.CreateSuccessResultWithMetadata(
             compilation,
+            targetProject,
             CompilationStrategy.MSBuild,
             0, // Will be set by caller
-            targetProject.AnalyzerConfigDocuments.FirstOrDefault()?.FilePath);
+            targetProject.AnalyzerConfigDocuments.FirstOrDefault()?.FilePath,
+            false,
+            null,
+            _logger);
         
         return (successResult, compilation);
     }
@@ -482,11 +494,15 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
         // Extract target framework from project properties
         var targetFramework = ExtractTargetFramework(project);
         
-        var successResult = CompilationResultMapper.CreateSuccessResult(
+        var successResult = CompilationResultMapper.CreateSuccessResultWithMetadata(
             compilation,
+            project,
             CompilationStrategy.MSBuild,
             0, // Will be set by caller
-            targetFramework);
+            targetFramework,
+            false,
+            null,
+            _logger);
         
         return (successResult, compilation);
     }

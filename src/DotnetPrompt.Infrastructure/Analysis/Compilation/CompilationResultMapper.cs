@@ -2,6 +2,7 @@ using DotnetPrompt.Core.Models.Enums;
 using DotnetPrompt.Core.Models.RoslynAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.Extensions.Logging;
 
 namespace DotnetPrompt.Infrastructure.Analysis.Compilation;
 
@@ -33,6 +34,36 @@ public static class CompilationResultMapper
             TargetFramework = targetFramework,
             Diagnostics = CreateDiagnosticsSummary(diagnostics),
             Compilation = compilation // Set the compilation reference
+        };
+    }
+
+    /// <summary>
+    /// Creates a successful Core CompilationResult from a Roslyn Compilation with project metadata
+    /// </summary>
+    public static CompilationResult CreateSuccessResultWithMetadata(
+        Microsoft.CodeAnalysis.Compilation compilation,
+        Project project,
+        CompilationStrategy strategy,
+        long compilationTimeMs,
+        string? targetFramework = null,
+        bool fallbackUsed = false,
+        string? fallbackReason = null,
+        ILogger? logger = null)
+    {
+        var diagnostics = compilation.GetDiagnostics();
+        var metadata = ProjectMetadataExtractor.ExtractProjectMetadata(project, logger);
+        
+        return new CompilationResult(strategy, compilation.AssemblyName)
+        {
+            Success = true,
+            StrategyUsed = strategy,
+            FallbackUsed = fallbackUsed,
+            FallbackReason = fallbackReason,
+            CompilationTimeMs = compilationTimeMs,
+            TargetFramework = targetFramework,
+            Diagnostics = CreateDiagnosticsSummary(diagnostics),
+            Compilation = compilation,
+            ProjectMetadata = metadata
         };
     }
 
