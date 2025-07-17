@@ -1,4 +1,6 @@
-using DotnetPrompt.Infrastructure.Analysis.Models;
+using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Models.Enums;
+using DotnetPrompt.Core.Models.RoslynAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
@@ -9,7 +11,7 @@ namespace DotnetPrompt.Infrastructure.Analysis.Compilation;
 /// <summary>
 /// Custom compilation strategy for lightweight analysis scenarios
 /// </summary>
-public class CustomCompilationStrategy : ICompilationStrategy
+public class CustomCompilationStrategy : IRoslynCompilationStrategy
 {
     private readonly ILogger<CustomCompilationStrategy> _logger;
 
@@ -19,6 +21,10 @@ public class CustomCompilationStrategy : ICompilationStrategy
     }
 
     public CompilationStrategy StrategyType => CompilationStrategy.Custom;
+    
+    public int Priority => 50; // Lower priority - fallback strategy
+    
+    public string Description => "Custom compilation strategy for lightweight analysis without MSBuild dependencies";
 
     public bool CanHandle(string projectPath, AnalysisOptions options)
     {
@@ -47,13 +53,10 @@ public class CustomCompilationStrategy : ICompilationStrategy
             
             if (!syntaxTrees.Any())
             {
-                return new CompilationResult
-                {
-                    Success = false,
-                    StrategyUsed = CompilationStrategy.Custom,
-                    ErrorMessage = "No C# source files found for compilation",
-                    CompilationTimeMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds
-                };
+                return CompilationResultMapper.CreateFailureResult(
+                    CompilationStrategy.Custom,
+                    "No C# source files found for compilation",
+                    (long)(DateTime.UtcNow - startTime).TotalMilliseconds);
             }
             
             // Get basic references
@@ -70,11 +73,12 @@ public class CustomCompilationStrategy : ICompilationStrategy
                 references: references,
                 options: new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             
-            var result = new CompilationResult(compilation, CompilationStrategy.Custom)
-            {
-                CompilationTimeMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds,
-                Diagnostics = compilation.GetDiagnostics()
-            };
+            var compilationTimeMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            var result = CompilationResultMapper.CreateSuccessResult(
+                compilation,
+                CompilationStrategy.Custom,
+                compilationTimeMs,
+                options.TargetFramework);
             
             _logger.LogInformation("Custom compilation completed for {ProjectPath} in {Duration}ms", 
                 projectPath, result.CompilationTimeMs);
@@ -85,13 +89,10 @@ public class CustomCompilationStrategy : ICompilationStrategy
         {
             _logger.LogError(ex, "Custom compilation failed for {ProjectPath}", projectPath);
             
-            return new CompilationResult
-            {
-                Success = false,
-                StrategyUsed = CompilationStrategy.Custom,
-                ErrorMessage = ex.Message,
-                CompilationTimeMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds
-            };
+            return CompilationResultMapper.CreateFailureResult(
+                CompilationStrategy.Custom,
+                ex.Message,
+                (long)(DateTime.UtcNow - startTime).TotalMilliseconds);
         }
     }
 
@@ -196,5 +197,73 @@ public class CustomCompilationStrategy : ICompilationStrategy
         }
         
         return references;
+    }
+
+    /// <summary>
+    /// Creates a compilation and provides access to the raw Roslyn compilation for semantic analysis
+    /// </summary>
+    public async Task<(CompilationResult Result, Microsoft.CodeAnalysis.Compilation? RoslynCompilation)> CreateCompilationWithRoslynAsync(
+        string projectPath, 
+        AnalysisCompilationOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        var startTime = DateTime.UtcNow;
+        
+        try
+        {
+            _logger.LogInformation("Starting custom compilation for {ProjectPath}", projectPath);
+            
+            // Determine if this is a project file or directory
+            var sourceDirectory = File.Exists(projectPath) ? Path.GetDirectoryName(projectPath)! : projectPath;
+            var projectFile = File.Exists(projectPath) ? projectPath : FindProjectFile(sourceDirectory);
+            
+            // Load syntax trees
+            var syntaxTrees = await LoadSyntaxTreesAsync(sourceDirectory, options, cancellationToken);
+            
+            if (!syntaxTrees.Any())
+            {
+                var failureResult = CompilationResultMapper.CreateFailureResult(
+                    CompilationStrategy.Custom,
+                    "No C# source files found for compilation",
+                    (long)(DateTime.UtcNow - startTime).TotalMilliseconds);
+                return (failureResult, null);
+            }
+            
+            // Get basic references
+            var references = GetBasicReferences(projectFile);
+            
+            // Create compilation
+            var assemblyName = projectFile != null 
+                ? Path.GetFileNameWithoutExtension(projectFile)
+                : Path.GetFileName(sourceDirectory.TrimEnd(Path.DirectorySeparatorChar));
+                
+            var compilation = CSharpCompilation.Create(
+                assemblyName: assemblyName,
+                syntaxTrees: syntaxTrees,
+                references: references,
+                options: new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            
+            var compilationTimeMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
+            var result = CompilationResultMapper.CreateSuccessResult(
+                compilation,
+                CompilationStrategy.Custom,
+                compilationTimeMs,
+                options.TargetFramework);
+            
+            _logger.LogInformation("Custom compilation completed for {ProjectPath} in {Duration}ms", 
+                projectPath, result.CompilationTimeMs);
+            
+            return (result, compilation);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Custom compilation failed for {ProjectPath}", projectPath);
+            
+            var failureResult = CompilationResultMapper.CreateFailureResult(
+                CompilationStrategy.Custom,
+                ex.Message,
+                (long)(DateTime.UtcNow - startTime).TotalMilliseconds);
+            return (failureResult, null);
+        }
     }
 }

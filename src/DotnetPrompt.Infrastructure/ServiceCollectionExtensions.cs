@@ -1,6 +1,4 @@
 using DotnetPrompt.Core.Interfaces;
-using DotnetPrompt.Infrastructure.Analysis;
-using DotnetPrompt.Infrastructure.Analysis.Compilation;
 using DotnetPrompt.Infrastructure.Configuration;
 using DotnetPrompt.Infrastructure.Extensions;
 using DotnetPrompt.Infrastructure.Filters;
@@ -10,6 +8,8 @@ using DotnetPrompt.Infrastructure.Models;
 using DotnetPrompt.Infrastructure.Resume;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
+using DotnetPrompt.Infrastructure.Analysis;
+using DotnetPrompt.Infrastructure.Analysis.Compilation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -176,8 +176,8 @@ public static class ServiceCollectionExtensions
         // This ensures MSBuild Locator is ready before any services are created
         MSBuildSetup.EnsureInitialized();
         
-        // Core Roslyn analysis service
-        services.AddScoped<DotnetPrompt.Infrastructure.Analysis.IRoslynAnalysisService, RoslynAnalysisService>();
+        // Core Roslyn analysis service using Core interface
+        services.AddScoped<IRoslynAnalysisService, RoslynAnalysisService>();
         
         // MSBuild diagnostics handler for error processing
         services.AddScoped<MSBuildDiagnosticsHandler>();
@@ -186,13 +186,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MSBuildWorkspaceStrategy>();
         services.AddScoped<CustomCompilationStrategy>();
         
-        // Default strategy selector - using MSBuild as primary for now
-        services.AddScoped<DotnetPrompt.Infrastructure.Analysis.Compilation.ICompilationStrategy>(serviceProvider =>
-        {
-            // Return MSBuildWorkspaceStrategy as the default implementation
-            // In the future, this could be enhanced with a strategy factory pattern
-            return serviceProvider.GetRequiredService<MSBuildWorkspaceStrategy>();
-        });
+        // Strategy factory for selecting optimal compilation approach
+        services.AddScoped<ICompilationStrategyFactory, CompilationStrategyFactory>();
         
         // Analysis engines (to be implemented in future phases)
         // services.AddScoped<SemanticAnalysisEngine>();

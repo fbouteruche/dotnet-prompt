@@ -1,5 +1,5 @@
-using DotnetPrompt.Infrastructure.Analysis.Compilation;
-using DotnetPrompt.Infrastructure.Analysis.Models;
+using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Models.RoslynAnalysis;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.Json;
@@ -13,17 +13,17 @@ namespace DotnetPrompt.Infrastructure.Analysis;
 public class RoslynAnalysisService : IRoslynAnalysisService
 {
     private readonly ILogger<RoslynAnalysisService> _logger;
-    private readonly ICompilationStrategy _compilationStrategy;
+    private readonly ICompilationStrategyFactory _compilationStrategyFactory;
 
     public RoslynAnalysisService(
         ILogger<RoslynAnalysisService> logger,
-        ICompilationStrategy compilationStrategy)
+        ICompilationStrategyFactory compilationStrategyFactory)
     {
         _logger = logger;
-        _compilationStrategy = compilationStrategy;
+        _compilationStrategyFactory = compilationStrategyFactory;
     }
 
-    public async Task<string> AnalyzeAsync(
+    public async Task<RoslynAnalysisResult> AnalyzeAsync(
         string projectPath,
         AnalysisOptions options,
         CancellationToken cancellationToken = default)
@@ -66,7 +66,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             _logger.LogInformation("Roslyn analysis completed for {ProjectPath} in {Duration}ms", 
                 projectPath, result.ExecutionTimeMs);
 
-            return SerializeResult(result);
+            return result;
         }
         catch (Exception ex)
         {
@@ -77,7 +77,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             result.ErrorMessage = ex.Message;
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            return SerializeResult(result);
+            return result;
         }
     }
 
@@ -118,27 +118,44 @@ public class RoslynAnalysisService : IRoslynAnalysisService
                 ExcludeGenerated = options.ExcludeGenerated
             };
 
-            var compilation = await _compilationStrategy.CreateCompilationAsync(
-                projectPath, compilationOptions, cancellationToken);
-
-            result.Compilation = MapCompilationInfo(compilation);
-
-            // Perform semantic analysis if compilation succeeded and requested
-            if (compilation.Success && 
-                compilation.Compilation != null && 
-                options.SemanticDepth != SemanticAnalysisDepth.None)
+            // Get the appropriate compilation strategy
+            var strategy = _compilationStrategyFactory.GetStrategy(projectPath, options);
+            
+            // Check if strategy supports Roslyn bridge interface
+            if (strategy is IRoslynCompilationStrategy roslynStrategy)
             {
-                result.Semantics = await PerformSemanticAnalysis(
-                    compilation.Compilation, options, cancellationToken);
+                var (compilationResult, roslynCompilation) = await roslynStrategy.CreateCompilationWithRoslynAsync(
+                    projectPath, compilationOptions, cancellationToken);
+
+                result.Compilation = MapCompilationInfo(compilationResult);
+
+                // Perform semantic analysis if compilation succeeded and requested
+                if (compilationResult.Success && 
+                    roslynCompilation != null && 
+                    options.SemanticDepth != SemanticAnalysisDepth.None)
+                {
+                    result.Semantics = await PerformSemanticAnalysis(
+                        roslynCompilation, options, cancellationToken);
+                }
+
+                // Perform metrics analysis if requested
+                if (compilationResult.Success && 
+                    roslynCompilation != null && 
+                    options.IncludeMetrics)
+                {
+                    result.Metrics = await CalculateMetrics(
+                        roslynCompilation, options, cancellationToken);
+                }
             }
-
-            // Perform metrics analysis if requested
-            if (compilation.Success && 
-                compilation.Compilation != null && 
-                options.IncludeMetrics)
+            else
             {
-                result.Metrics = await CalculateMetrics(
-                    compilation.Compilation, options, cancellationToken);
+                // Fallback for strategies that don't support Roslyn bridge
+                var compilationResult = await strategy.CreateCompilationAsync(
+                    projectPath, compilationOptions, cancellationToken);
+                
+                result.Compilation = MapCompilationInfo(compilationResult);
+                
+                _logger.LogWarning("Strategy {StrategyType} doesn't support semantic analysis", strategy.GetType().Name);
             }
         }
         catch (Exception ex)
@@ -379,8 +396,6 @@ public class RoslynAnalysisService : IRoslynAnalysisService
 
     private CompilationInfo MapCompilationInfo(CompilationResult compilation)
     {
-        var diagnostics = compilation.Diagnostics.ToList();
-        
         return new CompilationInfo
         {
             Success = compilation.Success,
@@ -390,9 +405,9 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             CompilationTimeMs = compilation.CompilationTimeMs,
             DiagnosticCount = new DiagnosticCount
             {
-                Errors = diagnostics.Count(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error),
-                Warnings = diagnostics.Count(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Warning),
-                Info = diagnostics.Count(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Info)
+                Errors = compilation.Diagnostics.ErrorCount,
+                Warnings = compilation.Diagnostics.WarningCount,
+                Info = compilation.Diagnostics.InfoCount
             }
         };
     }

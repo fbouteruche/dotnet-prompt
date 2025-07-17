@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
-using DotnetPrompt.Infrastructure.Analysis.Models;
+using DotnetPrompt.Core.Models.Enums;
+using DotnetPrompt.Core.Models.RoslynAnalysis;
 
 namespace DotnetPrompt.Infrastructure.SemanticKernel;
 
