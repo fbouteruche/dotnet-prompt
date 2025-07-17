@@ -1,6 +1,7 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Models;
 using DotnetPrompt.Core.Parsing;
+using DotnetPrompt.Infrastructure;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 using DotnetPrompt.Infrastructure.Models;
@@ -46,6 +47,19 @@ public class SkKernelIntegrationTests : IDisposable
         // Register plugin dependencies (following Clean Architecture DI patterns)
         services.AddSingleton<ILogger<FileSystemPlugin>>(new MockLogger<FileSystemPlugin>());
         services.AddSingleton<ILogger<ProjectAnalysisPlugin>>(new MockLogger<ProjectAnalysisPlugin>());
+        
+        // Add required loggers for Roslyn analysis services
+        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.Analysis.RoslynAnalysisService>>(
+            new MockLogger<DotnetPrompt.Infrastructure.Analysis.RoslynAnalysisService>());
+        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.Analysis.Compilation.MSBuildWorkspaceStrategy>>(
+            new MockLogger<DotnetPrompt.Infrastructure.Analysis.Compilation.MSBuildWorkspaceStrategy>());
+        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.MSBuildDiagnosticsHandler>>(
+            new MockLogger<DotnetPrompt.Infrastructure.SemanticKernel.MSBuildDiagnosticsHandler>());
+        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.Analysis.Compilation.CustomCompilationStrategy>>(
+            new MockLogger<DotnetPrompt.Infrastructure.Analysis.Compilation.CustomCompilationStrategy>());
+        
+        // Add Roslyn analysis services required by ProjectAnalysisPlugin
+        services.AddRoslynAnalysisServices();
         
         // Configure FileSystemOptions for FileSystemPlugin
         services.Configure<FileSystemOptions>(options =>
