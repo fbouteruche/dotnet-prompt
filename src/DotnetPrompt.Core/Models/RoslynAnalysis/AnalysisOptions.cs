@@ -133,6 +133,31 @@ public class AnalysisCompilationOptions
     public int CompilationTimeout { get; set; } = 60000;
     
     /// <summary>
+    /// MSBuild workspace timeout in milliseconds
+    /// </summary>
+    [JsonPropertyName("msbuild_timeout")]
+    [Range(1000, 300000, ErrorMessage = "MSBuild timeout must be between 1 second and 5 minutes")]
+    public int MSBuildTimeout { get; set; } = 30000;
+    
+    /// <summary>
+    /// Fallback to custom compilation if MSBuild fails
+    /// </summary>
+    [JsonPropertyName("fallback_to_custom")]
+    public bool FallbackToCustom { get; set; } = true;
+    
+    /// <summary>
+    /// Use lightweight custom compilation mode
+    /// </summary>
+    [JsonPropertyName("lightweight_mode")]
+    public bool LightweightMode { get; set; } = false;
+    
+    /// <summary>
+    /// Include test projects in analysis
+    /// </summary>
+    [JsonPropertyName("include_tests")]
+    public bool IncludeTests { get; set; } = true;
+    
+    /// <summary>
     /// Exclude auto-generated code from compilation
     /// </summary>
     [JsonPropertyName("exclude_generated")]

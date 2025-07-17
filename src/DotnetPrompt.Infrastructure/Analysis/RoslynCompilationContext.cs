@@ -6,7 +6,7 @@ namespace DotnetPrompt.Infrastructure.Analysis;
 /// Context for holding Roslyn compilation artifacts during analysis
 /// Bridges the gap between Core domain models and Infrastructure Roslyn implementations
 /// </summary>
-internal class RoslynCompilationContext
+public class RoslynCompilationContext
 {
     /// <summary>
     /// The actual Roslyn compilation for semantic analysis

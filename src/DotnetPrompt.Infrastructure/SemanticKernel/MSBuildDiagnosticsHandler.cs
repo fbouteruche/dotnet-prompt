@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using DotnetPrompt.Core.Models.Enums;
 using DotnetPrompt.Core.Models.RoslynAnalysis;
+using DotnetPrompt.Infrastructure.Analysis;
 
 namespace DotnetPrompt.Infrastructure.SemanticKernel;
 
@@ -70,9 +71,9 @@ public class MSBuildDiagnosticsHandler
     /// Analyzes diagnostics to determine if fallback to custom compilation is recommended
     /// </summary>
     /// <param name="diagnostics">Collection of workspace diagnostics</param>
-    /// <param name="result">Compilation result to analyze</param>
+    /// <param name="compilationContext">Compilation context to analyze (optional)</param>
     /// <returns>True if fallback is recommended</returns>
-    public bool ShouldFallbackToCustom(IEnumerable<WorkspaceDiagnostic> diagnostics, CompilationResult? result)
+    public bool ShouldFallbackToCustom(IEnumerable<WorkspaceDiagnostic> diagnostics, RoslynCompilationContext? compilationContext = null)
     {
         var diagnosticsList = diagnostics.ToList();
         var criticalErrors = diagnosticsList.Count(d => d.Kind == WorkspaceDiagnosticKind.Failure);
@@ -85,20 +86,23 @@ public class MSBuildDiagnosticsHandler
         }
         
         // Fallback if compilation completely failed
-        if (result?.Compilation == null)
+        if (compilationContext?.Compilation == null && compilationContext != null)
         {
             _logger.LogWarning("MSBuild compilation produced no result, recommending fallback to custom compilation");
             return true;
         }
         
         // Fallback if too many compilation errors
-        var compilationErrors = result.Compilation.GetDiagnostics()
-            .Count(d => d.Severity == DiagnosticSeverity.Error);
-            
-        if (compilationErrors > 50)
+        if (compilationContext?.Compilation != null)
         {
-            _logger.LogWarning("Too many compilation errors ({Count}), recommending fallback to custom compilation", compilationErrors);
-            return true;
+            var compilationErrors = compilationContext.Compilation.GetDiagnostics()
+                .Count(d => d.Severity == DiagnosticSeverity.Error);
+                
+            if (compilationErrors > 50)
+            {
+                _logger.LogWarning("Too many compilation errors ({Count}), recommending fallback to custom compilation", compilationErrors);
+                return true;
+            }
         }
         
         // Check for specific error patterns that indicate MSBuild issues
@@ -190,7 +194,7 @@ public class MSBuildDiagnosticsHandler
         {
             summary += " Critical issues may prevent full semantic analysis.";
             
-            if (ShouldFallbackToCustom(diagnosticsList, null))
+            if (ShouldFallbackToCustom(diagnosticsList))
             {
                 summary += " Consider using custom compilation fallback for better results.";
             }
