@@ -172,11 +172,27 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddRoslynAnalysisServices(this IServiceCollection services)
     {
-        // Core Roslyn analysis service - using Infrastructure implementation for now
+        // Initialize MSBuild setup early in the DI registration process
+        // This ensures MSBuild Locator is ready before any services are created
+        MSBuildSetup.EnsureInitialized();
+        
+        // Core Roslyn analysis service
         services.AddScoped<DotnetPrompt.Infrastructure.Analysis.IRoslynAnalysisService, RoslynAnalysisService>();
         
-        // Compilation strategies - using Infrastructure implementation for now
-        services.AddScoped<DotnetPrompt.Infrastructure.Analysis.Compilation.ICompilationStrategy, CustomCompilationStrategy>();
+        // MSBuild diagnostics handler for error processing
+        services.AddScoped<MSBuildDiagnosticsHandler>();
+        
+        // Compilation strategies with MSBuild integration
+        services.AddScoped<MSBuildWorkspaceStrategy>();
+        services.AddScoped<CustomCompilationStrategy>();
+        
+        // Default strategy selector - using MSBuild as primary for now
+        services.AddScoped<DotnetPrompt.Infrastructure.Analysis.Compilation.ICompilationStrategy>(serviceProvider =>
+        {
+            // Return MSBuildWorkspaceStrategy as the default implementation
+            // In the future, this could be enhanced with a strategy factory pattern
+            return serviceProvider.GetRequiredService<MSBuildWorkspaceStrategy>();
+        });
         
         // Analysis engines (to be implemented in future phases)
         // services.AddScoped<SemanticAnalysisEngine>();
