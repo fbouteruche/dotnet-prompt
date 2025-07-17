@@ -172,11 +172,11 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddRoslynAnalysisServices(this IServiceCollection services)
     {
-        // Core Roslyn analysis service
-        services.AddScoped<IRoslynAnalysisService, RoslynAnalysisService>();
+        // Core Roslyn analysis service - using Infrastructure implementation for now
+        services.AddScoped<DotnetPrompt.Infrastructure.Analysis.IRoslynAnalysisService, RoslynAnalysisService>();
         
-        // Compilation strategies
-        services.AddScoped<ICompilationStrategy, CustomCompilationStrategy>();
+        // Compilation strategies - using Infrastructure implementation for now
+        services.AddScoped<DotnetPrompt.Infrastructure.Analysis.Compilation.ICompilationStrategy, CustomCompilationStrategy>();
         
         // Analysis engines (to be implemented in future phases)
         // services.AddScoped<SemanticAnalysisEngine>();
