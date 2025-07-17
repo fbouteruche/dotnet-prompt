@@ -19,6 +19,12 @@ Before implementing ANY code changes or architectural decisions, you MUST:
      - [`workflow-format-specification.md`](../docs/specifications/workflow-format-specification.md)
      - [`workflow-orchestrator-specification.md`](../docs/specifications/workflow-orchestrator-specification.md)
      - [`workflow-resume-system-specification.md`](../docs/specifications/workflow-resume-system-specification.md)
+   - [`docs/developer/`](../docs/developer/) - Tool developer and implementation documentation:
+     - [`build-test-tool.md`](../docs/developer/build-test-tool.md) - Build & Test tool implementation guide
+     - [`configuration.md`](../docs/developer/configuration.md) - Configuration system implementation details
+     - [`file-system-tool.md`](../docs/developer/file-system-tool.md) - File System tool implementation guide
+     - [`file-system-tool-examples.md`](../docs/developer/file-system-tool-examples.md) - File System tool usage examples
+     - [`project-analysis-tool.md`](../docs/developer/project-analysis-tool.md) - Project Analysis tool implementation guide
 
 2. **Validate Against Specifications**: If a user request conflicts with established specifications:
    - **STOP** and inform the user of the conflict
@@ -36,6 +42,12 @@ Before implementing ANY code changes or architectural decisions, you MUST:
    - **All generated code MUST align with current specifications**
    - **Specifications are updated BEFORE code implementation**
    - **No exceptions to this rule - specifications drive implementation**
+
+5. **Documentation Registration Requirement**:
+   - **Any new documentation added to `docs/specifications/` or `docs/developer/` MUST be registered as authoritative documentation**
+   - **Update the "Reference the Authoritative Documentation" section above to include all new specification and developer documents**
+   - **This ensures all implementers are guided to consult the complete set of authoritative documentation**
+   - **No specification or developer documentation should exist without being referenced in this instruction file**
 
 ## Project Overview
 
