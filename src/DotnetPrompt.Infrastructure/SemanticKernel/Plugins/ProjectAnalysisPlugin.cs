@@ -1,8 +1,10 @@
 using System.ComponentModel;
-using DotnetPrompt.Infrastructure.Analysis;
-using DotnetPrompt.Infrastructure.Analysis.Models;
+using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Models.Enums;
+using DotnetPrompt.Core.Models.RoslynAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using System.Text.Json;
 
 namespace DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 
@@ -75,7 +77,13 @@ public class ProjectAnalysisPlugin
             
             _logger.LogInformation("Successfully completed Roslyn analysis for {ProjectPath}", validatedPath);
             
-            return result;
+            // Serialize result for AI consumption
+            return JsonSerializer.Serialize(result, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            });
         }
         catch (Exception ex)
         {
