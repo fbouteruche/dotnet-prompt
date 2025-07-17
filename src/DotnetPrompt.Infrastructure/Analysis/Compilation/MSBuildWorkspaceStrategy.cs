@@ -23,6 +23,9 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
         _logger = logger;
         _diagnosticsHandler = diagnosticsHandler;
         
+        // Set logger for MSBuild setup operations
+        MSBuildSetup.SetLogger(logger);
+        
         // Critical: Ensure MSBuild is initialized before any workspace operations
         MSBuildSetup.EnsureInitialized();
     }
@@ -53,8 +56,17 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
         {
             _logger.LogInformation("Starting MSBuild compilation for {ProjectPath}", projectPath);
             
-            // Create MSBuild workspace with timeout
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(options.MSBuildTimeout));
+            // Validate MSBuild environment before proceeding
+            if (!_diagnosticsHandler.ValidateMSBuildEnvironment())
+            {
+                return CompilationResultMapper.CreateFailureResult(
+                    CompilationStrategy.MSBuild,
+                    "MSBuild environment validation failed. See logs for details.",
+                    (long)(DateTime.UtcNow - startTime).TotalMilliseconds);
+            }
+            
+            // Create MSBuild workspace with enhanced timeout handling
+            using var timeoutCts = _diagnosticsHandler.CreateTimeoutHandler(options.MSBuildTimeout, "MSBuild workspace creation");
             using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             
             workspace = MSBuildWorkspace.Create(new Dictionary<string, string>
@@ -106,9 +118,19 @@ public class MSBuildWorkspaceStrategy : IRoslynCompilationStrategy
         {
             _logger.LogError(ex, "MSBuild compilation failed for {ProjectPath}", projectPath);
             
+            // Process workspace diagnostics to provide recovery suggestions
+            var diagnostics = workspace?.Diagnostics ?? Enumerable.Empty<WorkspaceDiagnostic>();
+            var suggestions = _diagnosticsHandler.GetRecoverySuggestions(diagnostics);
+            
+            var errorMessage = $"MSBuild compilation failed: {ex.Message}";
+            if (suggestions.Any())
+            {
+                errorMessage += "\n\nRecovery suggestions:\n" + string.Join("\n", suggestions.Select(s => $"• {s}"));
+            }
+            
             return CompilationResultMapper.CreateFailureResult(
                 CompilationStrategy.MSBuild,
-                $"MSBuild compilation failed: {ex.Message}",
+                errorMessage,
                 (long)(DateTime.UtcNow - startTime).TotalMilliseconds);
         }
         finally

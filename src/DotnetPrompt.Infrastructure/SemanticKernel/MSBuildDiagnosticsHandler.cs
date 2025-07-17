@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using DotnetPrompt.Core.Models.Enums;
 using DotnetPrompt.Core.Models.RoslynAnalysis;
 using DotnetPrompt.Infrastructure.Analysis;
+using Microsoft.Build.Locator;
 
 namespace DotnetPrompt.Infrastructure.SemanticKernel;
 
@@ -209,5 +210,108 @@ public class MSBuildDiagnosticsHandler
     private static bool ContainsIgnoreCase(string source, string value)
     {
         return source.Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+    
+    /// <summary>
+    /// Creates a timeout handler for MSBuild operations
+    /// </summary>
+    /// <param name="timeoutMs">Timeout in milliseconds</param>
+    /// <param name="operationName">Name of the operation for logging</param>
+    /// <returns>CancellationTokenSource configured with timeout</returns>
+    public CancellationTokenSource CreateTimeoutHandler(int timeoutMs, string operationName)
+    {
+        _logger.LogDebug("Creating timeout handler for {Operation} with {Timeout}ms timeout", operationName, timeoutMs);
+        
+        var timeoutCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
+        
+        // Register callback for timeout logging
+        timeoutCts.Token.Register(() =>
+        {
+            if (!timeoutCts.Token.IsCancellationRequested)
+                _logger.LogWarning("{Operation} timed out after {Timeout}ms", operationName, timeoutMs);
+        });
+        
+        return timeoutCts;
+    }
+    
+    /// <summary>
+    /// Validates MSBuild environment and provides setup recommendations
+    /// </summary>
+    /// <returns>True if MSBuild environment appears to be properly configured</returns>
+    public bool ValidateMSBuildEnvironment()
+    {
+        try
+        {
+            // Check if MSBuild Locator is registered
+            if (!MSBuildLocator.IsRegistered)
+            {
+                _logger.LogWarning("MSBuild Locator is not registered. Call MSBuildSetup.EnsureInitialized() first.");
+                return false;
+            }
+            
+            // Query available MSBuild instances
+            var instances = MSBuildLocator.QueryVisualStudioInstances().ToList();
+            if (!instances.Any())
+            {
+                _logger.LogWarning("No MSBuild instances found. Ensure .NET SDK or Visual Studio is installed.");
+                return false;
+            }
+            
+            _logger.LogInformation("MSBuild environment validation passed. {InstanceCount} instances available.", instances.Count);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "MSBuild environment validation failed");
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Provides recovery suggestions based on common MSBuild errors
+    /// </summary>
+    /// <param name="diagnostics">Collection of workspace diagnostics</param>
+    /// <returns>List of actionable recovery suggestions</returns>
+    public List<string> GetRecoverySuggestions(IEnumerable<WorkspaceDiagnostic> diagnostics)
+    {
+        var suggestions = new List<string>();
+        var messages = diagnostics.Select(d => d.Message).ToList();
+        
+        if (messages.Any(m => ContainsIgnoreCase(m, "SDK") && ContainsIgnoreCase(m, "not found")))
+        {
+            suggestions.Add("Install or update the .NET SDK: https://dotnet.microsoft.com/download");
+            suggestions.Add("Verify SDK installation with: dotnet --list-sdks");
+            suggestions.Add("Ensure the required SDK version is available for the target framework");
+        }
+        
+        if (messages.Any(m => ContainsIgnoreCase(m, "TargetFramework")))
+        {
+            suggestions.Add("Check if the target framework is supported by the installed SDK");
+            suggestions.Add("Consider updating the project to use a supported target framework");
+            suggestions.Add("Verify TargetFramework property in the project file");
+        }
+        
+        if (messages.Any(m => ContainsIgnoreCase(m, "PackageReference") || ContainsIgnoreCase(m, "package")))
+        {
+            suggestions.Add("Run 'dotnet restore' to resolve package dependencies");
+            suggestions.Add("Clear NuGet cache with: dotnet nuget locals all --clear");
+            suggestions.Add("Check if package sources are accessible");
+        }
+        
+        if (messages.Any(m => ContainsIgnoreCase(m, "access") && ContainsIgnoreCase(m, "denied")))
+        {
+            suggestions.Add("Run the process with elevated permissions if required");
+            suggestions.Add("Check file and directory permissions");
+            suggestions.Add("Ensure no files are locked by other processes");
+        }
+        
+        if (!suggestions.Any())
+        {
+            suggestions.Add("Try using the custom compilation fallback strategy");
+            suggestions.Add("Check the project file for syntax errors");
+            suggestions.Add("Verify all project dependencies are available");
+        }
+        
+        return suggestions;
     }
 }
