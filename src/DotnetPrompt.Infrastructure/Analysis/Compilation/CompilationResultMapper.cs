@@ -89,7 +89,7 @@ public static class CompilationResultMapper
         {
             Kind = d.Kind.ToString(),
             Message = d.Message,
-            ProjectPath = d.ProjectId?.ToString()
+            ProjectPath = null // WorkspaceDiagnostic doesn't have ProjectId in standard Roslyn
         }).ToList();
 
         return result;

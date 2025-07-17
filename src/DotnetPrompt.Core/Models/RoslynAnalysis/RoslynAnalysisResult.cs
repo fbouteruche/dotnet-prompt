@@ -113,6 +113,18 @@ public class RoslynAnalysisResult
     /// </summary>
     [JsonPropertyName("performance")]
     public PerformanceMetrics Performance { get; set; } = new();
+    
+    /// <summary>
+    /// Execution time in milliseconds (for backward compatibility)
+    /// </summary>
+    [JsonPropertyName("execution_time_ms")]
+    public long ExecutionTimeMs { get; set; }
+    
+    /// <summary>
+    /// Additional metadata for the analysis
+    /// </summary>
+    [JsonPropertyName("metadata")]
+    public Dictionary<string, object> Metadata { get; set; } = new();
 }
 
 /// <summary>
@@ -389,6 +401,12 @@ public class PackageReference
     /// </summary>
     [JsonPropertyName("target_framework")]
     public string? TargetFramework { get; set; }
+    
+    /// <summary>
+    /// Type of reference (e.g., "PackageReference", "ProjectReference")
+    /// </summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -1001,4 +1019,28 @@ public class PerformanceMetrics
     /// </summary>
     [JsonPropertyName("files_processed")]
     public int FilesProcessed { get; set; }
+    
+    /// <summary>
+    /// Total analysis time in milliseconds (for backward compatibility)
+    /// </summary>
+    [JsonPropertyName("total_analysis_time_ms")]
+    public long TotalAnalysisTimeMs { get; set; }
+    
+    /// <summary>
+    /// Semantic analysis time in milliseconds
+    /// </summary>
+    [JsonPropertyName("semantic_analysis_time_ms")]
+    public long SemanticAnalysisTimeMs { get; set; }
+    
+    /// <summary>
+    /// Metrics calculation time in milliseconds
+    /// </summary>
+    [JsonPropertyName("metrics_calculation_time_ms")]
+    public long MetricsCalculationTimeMs { get; set; }
+    
+    /// <summary>
+    /// Memory usage in megabytes
+    /// </summary>
+    [JsonPropertyName("memory_usage_mb")]
+    public double MemoryUsageMB { get; set; }
 }
