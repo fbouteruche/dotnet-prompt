@@ -1,7 +1,9 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Models;
 using DotnetPrompt.Infrastructure.Configuration;
+using DotnetPrompt.UnitTests.Utilities;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -14,11 +16,22 @@ public class ConfigurationServiceTests : IDisposable
     private readonly string _testDirectory;
     private readonly string _globalConfigPath;
     private readonly string _projectConfigPath;
+    private readonly IServiceProvider _serviceProvider;
 
     public ConfigurationServiceTests()
     {
         _mockLogger = new Mock<ILogger<ConfigurationService>>();
-        _configurationService = new ConfigurationService(_mockLogger.Object);
+        
+        // Use standardized test service builder  
+        var services = TestServiceCollectionBuilder.CreateMinimalTestServices();
+        services.AddSingleton(_mockLogger.Object);
+        
+        // Register the real ConfigurationService for testing
+        services.AddTransient<ConfigurationService>();
+        
+        _serviceProvider = services.BuildServiceProvider();
+        
+        _configurationService = _serviceProvider.GetRequiredService<ConfigurationService>();
         
         // Create a temporary test directory
         _testDirectory = Path.Combine(Path.GetTempPath(), "dotnet-prompt-tests", Guid.NewGuid().ToString());
@@ -58,7 +71,7 @@ public class ConfigurationServiceTests : IDisposable
             // Assert
             config.Should().NotBeNull();
             config.DefaultProvider.Should().Be("github");
-            config.DefaultModel.Should().Be("gpt-4o");
+            config.DefaultModel.Should().BeNull(); // No fallback model - must be explicitly specified
             config.Timeout.Should().Be(300);
             config.CacheEnabled.Should().BeTrue();
             config.TelemetryEnabled.Should().BeTrue();
@@ -375,9 +388,22 @@ public class ConfigurationServiceTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_testDirectory))
+        try
         {
-            Directory.Delete(_testDirectory, true);
+            if (Directory.Exists(_testDirectory))
+            {
+                Directory.Delete(_testDirectory, true);
+            }
+        }
+        catch
+        {
+            // Ignore cleanup errors in tests
+        }
+        
+        // Dispose service provider if it implements IDisposable
+        if (_serviceProvider is IDisposable disposable)
+        {
+            disposable.Dispose();
         }
     }
 
