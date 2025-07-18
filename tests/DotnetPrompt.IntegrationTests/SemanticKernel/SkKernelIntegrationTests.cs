@@ -28,53 +28,8 @@ public class SkKernelIntegrationTests : IDisposable
 
     public SkKernelIntegrationTests()
     {
-        var services = new ServiceCollection();
-        
-        // Setup minimal configuration for SK testing
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["AI:GitHub:Token"] = "test-token", // Mock token for testing
-                ["AI:GitHub:Model"] = "gpt-4o"
-            })
-            .Build();
-
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddSingleton<ILogger<KernelFactory>>(new MockLogger<KernelFactory>());
-        services.AddSingleton<IConfigurationService, MockConfigurationService>();
-        services.AddSingleton<IFunctionInvocationFilter, MockWorkflowExecutionFilter>();
-        
-        // Register plugin dependencies (following Clean Architecture DI patterns)
-        services.AddSingleton<ILogger<FileSystemPlugin>>(new MockLogger<FileSystemPlugin>());
-        services.AddSingleton<ILogger<ProjectAnalysisPlugin>>(new MockLogger<ProjectAnalysisPlugin>());
-        
-        // Add required loggers for Roslyn analysis services
-        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.Analysis.RoslynAnalysisService>>(
-            new MockLogger<DotnetPrompt.Infrastructure.Analysis.RoslynAnalysisService>());
-        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.Analysis.Compilation.MSBuildWorkspaceStrategy>>(
-            new MockLogger<DotnetPrompt.Infrastructure.Analysis.Compilation.MSBuildWorkspaceStrategy>());
-        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.MSBuildDiagnosticsHandler>>(
-            new MockLogger<DotnetPrompt.Infrastructure.SemanticKernel.MSBuildDiagnosticsHandler>());
-        services.AddSingleton<ILogger<DotnetPrompt.Infrastructure.Analysis.Compilation.CustomCompilationStrategy>>(
-            new MockLogger<DotnetPrompt.Infrastructure.Analysis.Compilation.CustomCompilationStrategy>());
-        
-        // Add Roslyn analysis services required by ProjectAnalysisPlugin
-        services.AddRoslynAnalysisServices();
-        
-        // Configure FileSystemOptions for FileSystemPlugin
-        services.Configure<FileSystemOptions>(options =>
-        {
-            // Set test-friendly defaults
-            options.MaxFileSizeBytes = 1024 * 1024; // 1MB for tests
-            options.AllowedExtensions = new[] { ".md", ".txt", ".json", ".yaml", ".yml" };
-            options.BlockedDirectories = new[] { "bin", "obj", ".git" };
-        });
-        
-        // Register plugins with their required dependencies (excluding SubWorkflowPlugin for now to simplify)
-        services.AddSingleton<FileSystemPlugin>();
-        services.AddSingleton<ProjectAnalysisPlugin>();
-        
-        services.AddSingleton<IKernelFactory, KernelFactory>();
+        // Use TestServiceCollectionBuilder for consistent dependency injection setup
+        var services = TestServiceCollectionBuilder.CreateIntegrationTestServices();
         
         _serviceProvider = services.BuildServiceProvider();
         _kernelFactory = _serviceProvider.GetRequiredService<IKernelFactory>();
