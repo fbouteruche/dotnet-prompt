@@ -27,7 +27,26 @@ public class MockConfigurationService : IConfigurationService
         string? frontmatterProvider = null,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new DotPromptConfiguration());
+        var config = new DotPromptConfiguration
+        {
+            DefaultProvider = "ollama",
+            DefaultModel = "test-model",
+            Providers = new Dictionary<string, ProviderConfiguration>
+            {
+                ["ollama"] = new ProviderConfiguration
+                {
+                    BaseUrl = "http://localhost:11434",
+                    Token = "dummy-token"
+                },
+                ["local"] = new ProviderConfiguration
+                {
+                    Endpoint = "http://localhost:11434",
+                    Token = "dummy-token"
+                }
+            }
+        };
+        
+        return Task.FromResult(config);
     }
 
     public Task<ConfigurationValidationResult> ValidateConfigurationAsync(

@@ -31,7 +31,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "sk-plugins-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             
             config:
@@ -73,7 +73,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "verbose-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             ---
             
@@ -111,7 +111,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "context-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             ---
             
@@ -148,7 +148,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "timeout-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             ---
             
@@ -190,7 +190,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "progress-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             
             config:
@@ -226,7 +226,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "resume-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             ---
             
@@ -258,7 +258,7 @@ public class CliExecutionTests : IDisposable
         var invalidWorkflowContent = """
             ---
             name: "invalid-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["nonexistent-tool"]
             invalid yaml structure here: [unclosed
             malformed: 
@@ -296,7 +296,7 @@ public class CliExecutionTests : IDisposable
         var workflowContent = """
             ---
             name: "filter-pipeline-test"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system", "project-analysis"]
             
             config:

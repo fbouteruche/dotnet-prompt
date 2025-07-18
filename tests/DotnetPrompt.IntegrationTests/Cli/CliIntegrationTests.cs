@@ -69,10 +69,10 @@ public class CliIntegrationTests
         // Arrange
         var tempFile = Path.GetTempFileName();
         var workflowFile = Path.ChangeExtension(tempFile, ".prompt.md");
-        await File.WriteAllTextAsync(workflowFile, "---\nname: test-workflow\nmodel: gpt-4o\n---\n# Test workflow\n\nThis is a valid test workflow.");
+        await File.WriteAllTextAsync(workflowFile, "---\nname: test-workflow\nmodel: ollama/test-model\n---\n# Test workflow\n\nThis is a valid test workflow.");
 
-        // Set environment variable to use local provider for integration testing (doesn't require credentials)
-        Environment.SetEnvironmentVariable("DOTNET_PROMPT_PROVIDER", "local");
+        // Set environment variable to use ollama provider for integration testing
+        Environment.SetEnvironmentVariable("DOTNET_PROMPT_PROVIDER", "ollama");
 
         try
         {
