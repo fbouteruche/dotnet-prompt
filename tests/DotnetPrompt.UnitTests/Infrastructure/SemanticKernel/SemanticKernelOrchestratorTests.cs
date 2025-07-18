@@ -29,42 +29,6 @@ public class SemanticKernelOrchestratorTests
             _mockLogger.Object);
     }
 
-    [Fact(Skip = "Kernel class cannot be mocked - requires interface abstraction")]
-    public async Task ValidateWorkflowAsync_WithValidWorkflow_ReturnsValidResult()
-    {
-        // Arrange
-        var workflow = new DotpromptWorkflow
-        {
-            Name = "test-workflow",
-            Model = "ollama/test-model",
-            Content = new WorkflowContent { RawMarkdown = "# Test\nHello {{name}}!" }
-        };
-        
-        var context = new WorkflowExecutionContext
-        {
-            Variables = new Dictionary<string, object> { { "name", "World" } }
-        };
-
-        var mockKernel = new Mock<Kernel>();
-        var mockTemplate = new Mock<IPromptTemplate>();
-        
-        _mockKernelFactory.Setup(x => x.CreateKernelAsync(null, null))
-            .ReturnsAsync(mockKernel.Object);
-        
-        _mockHandlebarsFactory.Setup(x => x.Create(It.IsAny<PromptTemplateConfig>()))
-            .Returns(mockTemplate.Object);
-        
-        mockTemplate.Setup(x => x.RenderAsync(It.IsAny<Kernel>(), It.IsAny<KernelArguments>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("Hello World!");
-
-        // Act
-        var result = await _orchestrator.ValidateWorkflowAsync(workflow, context);
-
-        // Assert
-        Assert.True(result.IsValid);
-        Assert.Empty(result.Errors!);
-    }
-
     [Fact]
     public async Task ValidateWorkflowAsync_WithEmptyContent_ReturnsInvalidResult()
     {
@@ -84,77 +48,6 @@ public class SemanticKernelOrchestratorTests
         // Assert
         Assert.False(result.IsValid);
         Assert.Contains("Workflow content cannot be empty", result.Errors!);
-    }
-
-    [Fact(Skip = "Kernel class cannot be mocked - requires interface abstraction")]
-    public async Task ValidateWorkflowAsync_WithInvalidTemplate_ReturnsInvalidResult()
-    {
-        // Arrange
-        var workflow = new DotpromptWorkflow
-        {
-            Name = "test-workflow",
-            Model = "ollama/test-model",
-            Content = new WorkflowContent { RawMarkdown = "Invalid {{template" }
-        };
-        
-        var context = new WorkflowExecutionContext();
-
-        var mockKernel = new Mock<Kernel>();
-        
-        _mockKernelFactory.Setup(x => x.CreateKernelAsync(null, null))
-            .ReturnsAsync(mockKernel.Object);
-        
-        _mockHandlebarsFactory.Setup(x => x.Create(It.IsAny<PromptTemplateConfig>()))
-            .Throws(new ArgumentException("Invalid template syntax"));
-
-        // Act
-        var result = await _orchestrator.ValidateWorkflowAsync(workflow, context);
-
-        // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains("Handlebars template validation failed", result.Errors!.First());
-    }
-
-    [Fact(Skip = "Kernel class cannot be mocked - requires interface abstraction")]
-    public async Task ExecuteWorkflowAsync_WithValidWorkflow_ReturnsSuccessResult()
-    {
-        // Arrange
-        var workflow = new DotpromptWorkflow
-        {
-            Name = "test-workflow",
-            Model = "ollama/test-model",
-            Content = new WorkflowContent { RawMarkdown = "Process: {{input}}" },
-            Config = new DotpromptConfig { Temperature = 0.7, MaxOutputTokens = 1000 }
-        };
-        
-        var context = new WorkflowExecutionContext
-        {
-            Variables = new Dictionary<string, object> { { "input", "test data" } }
-        };
-
-        var mockKernel = new Mock<Kernel>();
-        var mockFunction = new Mock<KernelFunction>();
-        var mockResult = new Mock<FunctionResult>();
-        
-        _mockKernelFactory.Setup(x => x.CreateKernelAsync(null, null))
-            .ReturnsAsync(mockKernel.Object);
-        
-        mockKernel.Setup(x => x.CreateFunctionFromPrompt(It.IsAny<PromptTemplateConfig>(), It.IsAny<IPromptTemplateFactory>()))
-            .Returns(mockFunction.Object);
-        
-        mockFunction.Setup(x => x.InvokeAsync(It.IsAny<Kernel>(), It.IsAny<KernelArguments>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockResult.Object);
-        
-        mockResult.Setup(x => x.ToString())
-            .Returns("Processed: test data");
-
-        // Act
-        var result = await _orchestrator.ExecuteWorkflowAsync(workflow, context);
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.Equal("Processed: test data", result.Output);
-        Assert.Null(result.ErrorMessage);
     }
 
     [Fact]
