@@ -79,17 +79,24 @@ public class MSBuildDiagnosticsHandler
         var diagnosticsList = diagnostics.ToList();
         var criticalErrors = diagnosticsList.Count(d => d.Kind == WorkspaceDiagnosticKind.Failure);
         
-        // Fallback if too many critical errors
-        if (criticalErrors > 10)
+        // Fallback if compilation context is null (no compilation was created)
+        if (compilationContext == null)
         {
-            _logger.LogWarning("Too many MSBuild errors ({Count}), recommending fallback to custom compilation", criticalErrors);
+            _logger.LogWarning("No compilation context provided, recommending fallback to custom compilation");
             return true;
         }
         
         // Fallback if compilation completely failed
-        if (compilationContext?.Compilation == null && compilationContext != null)
+        if (compilationContext.Compilation == null)
         {
             _logger.LogWarning("MSBuild compilation produced no result, recommending fallback to custom compilation");
+            return true;
+        }
+        
+        // Fallback if too many critical errors
+        if (criticalErrors > 10)
+        {
+            _logger.LogWarning("Too many MSBuild errors ({Count}), recommending fallback to custom compilation", criticalErrors);
             return true;
         }
         
