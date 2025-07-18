@@ -2,6 +2,7 @@ using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Models;
 using DotnetPrompt.Core.Parsing;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
+using DotnetPrompt.IntegrationTests.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -20,9 +21,8 @@ public class SubWorkflowPluginIntegrationTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), "subworkflow-integration-tests", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
 
-        // Setup minimal service provider for integration test
-        var services = new ServiceCollection();
-        services.AddSingleton<ILogger<SubWorkflowPlugin>>(new MockLogger<SubWorkflowPlugin>());
+        // Use TestServiceCollectionBuilder for consistent integration test setup
+        var services = TestServiceCollectionBuilder.CreateIntegrationTestServices();
         services.AddSingleton<IDotpromptParser, DotpromptParser>();
         services.AddSingleton<IWorkflowOrchestrator, MockWorkflowOrchestrator>();
         
@@ -195,14 +195,4 @@ public class SubWorkflowPluginIntegrationTests : IDisposable
             return Task.CompletedTask;
         }
     }
-}
-
-/// <summary>
-/// Mock logger for integration testing
-/// </summary>
-public class MockLogger<T> : ILogger<T>
-{
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-    public bool IsEnabled(LogLevel logLevel) => false;
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
 }

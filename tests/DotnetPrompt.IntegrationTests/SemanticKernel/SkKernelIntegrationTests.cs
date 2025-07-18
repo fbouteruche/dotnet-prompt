@@ -162,9 +162,24 @@ public class SkKernelIntegrationTests : IDisposable
 
             try
             {
+                // Create configuration with required model parameter
+                var config = new Dictionary<string, object>();
+                switch (provider)
+                {
+                    case "github":
+                        config["Model"] = "gpt-4o";
+                        break;
+                    case "openai":
+                        config["Model"] = "gpt-4o";
+                        break;
+                    case "azure":
+                        config["Endpoint"] = "https://test.openai.azure.com";
+                        config["Model"] = "gpt-4";
+                        break;
+                }
+
                 // Act
-                var kernel = await _kernelFactory.CreateKernelAsync(provider, 
-                    provider == "azure" ? new Dictionary<string, object> { { "Endpoint", "https://test.openai.azure.com" } } : null);
+                var kernel = await _kernelFactory.CreateKernelAsync(provider, config);
 
                 // Assert
                 kernel.Should().NotBeNull();

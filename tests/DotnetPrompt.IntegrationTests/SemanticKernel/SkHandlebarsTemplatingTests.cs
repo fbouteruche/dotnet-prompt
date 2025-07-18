@@ -32,39 +32,8 @@ public class SkHandlebarsTemplatingTests : IDisposable
         _testDirectory = Path.Combine(Path.GetTempPath(), "sk-handlebars-tests", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
 
-        var services = new ServiceCollection();
-        
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["AI:GitHub:Token"] = "test-token",
-                ["AI:GitHub:Model"] = "gpt-4o"
-            })
-            .Build();
-
-        services.AddSingleton<IConfiguration>(configuration);
-        services.AddSingleton<ILogger<KernelFactory>>(new MockLogger<KernelFactory>());
-        services.AddSingleton<IConfigurationService, MockConfigurationService>();
-        services.AddSingleton<IFunctionInvocationFilter, MockWorkflowExecutionFilter>();
-        
-        // Register plugin dependencies (following Clean Architecture DI patterns)
-        services.AddSingleton<ILogger<FileSystemPlugin>>(new MockLogger<FileSystemPlugin>());
-        services.AddSingleton<ILogger<ProjectAnalysisPlugin>>(new MockLogger<ProjectAnalysisPlugin>());
-        
-        // Configure FileSystemOptions for FileSystemPlugin
-        services.Configure<FileSystemOptions>(options =>
-        {
-            // Set test-friendly defaults
-            options.MaxFileSizeBytes = 1024 * 1024; // 1MB for tests
-            options.AllowedExtensions = new[] { ".md", ".txt", ".json", ".yaml", ".yml" };
-            options.BlockedDirectories = new[] { "bin", "obj", ".git" };
-        });
-        
-        // Register plugins with their required dependencies
-        services.AddSingleton<FileSystemPlugin>();
-        services.AddSingleton<ProjectAnalysisPlugin>();
-        
-        services.AddSingleton<IKernelFactory, KernelFactory>();
+        // Use enhanced TestServiceCollectionBuilder for consistent integration test services
+        var services = TestServiceCollectionBuilder.CreateIntegrationTestServices();
 
         _serviceProvider = services.BuildServiceProvider();
         _kernelFactory = _serviceProvider.GetRequiredService<IKernelFactory>();
@@ -93,7 +62,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
         try
         {
             // Act
-            var kernel = await _kernelFactory.CreateKernelAsync("github");
+            var kernel = await _kernelFactory.CreateKernelAsync("ollama");
             
             // Create SK Handlebars template factory
             var templateFactory = new HandlebarsPromptTemplateFactory();
@@ -148,7 +117,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
         try
         {
             // Act
-            var kernel = await _kernelFactory.CreateKernelAsync("github");
+            var kernel = await _kernelFactory.CreateKernelAsync("ollama");
             
             var templateFactory = new HandlebarsPromptTemplateFactory();
             var templateConfig = new PromptTemplateConfig(handlebarsTemplate)
@@ -179,7 +148,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
         var workflowContent = """
             ---
             name: "test-handlebars-workflow"
-            model: "gpt-4o"
+            model: "ollama/test-model"
             tools: ["file-system"]
             
             config:
@@ -213,7 +182,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
             var workflow = await parser.ParseFileAsync(workflowFile);
 
             // Create kernel and test basic functionality
-            var kernel = await _kernelFactory.CreateKernelAsync("github");
+            var kernel = await _kernelFactory.CreateKernelAsync("ollama");
 
             // Assert basic parsing worked
             workflow.Should().NotBeNull();
@@ -272,7 +241,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
                     ["enabled"] = true,
                     ["config"] = new Dictionary<string, object>
                     {
-                        ["model"] = "gpt-4o",
+                        ["model"] = "ollama/test-model",
                         ["temperature"] = 0.7
                     }
                 },
@@ -287,7 +256,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
         try
         {
             // Act
-            var kernel = await _kernelFactory.CreateKernelAsync("github");
+            var kernel = await _kernelFactory.CreateKernelAsync("ollama");
             
             var templateFactory = new HandlebarsPromptTemplateFactory();
             var templateConfig = new PromptTemplateConfig(complexTemplate)
@@ -301,7 +270,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
             // Assert
             renderedTemplate.Should().Contain("Provider: OpenAI");
             renderedTemplate.Should().Contain("Status: ✅ Enabled");
-            renderedTemplate.Should().Contain("model: gpt-4o");
+            renderedTemplate.Should().Contain("model: ollama/test-model");
             renderedTemplate.Should().Contain("temperature: 0.7");
             renderedTemplate.Should().Contain("Provider: Azure");
             renderedTemplate.Should().Contain("Status: ❌ Disabled");
@@ -341,7 +310,7 @@ public class SkHandlebarsTemplatingTests : IDisposable
         try
         {
             // Act
-            var kernel = await _kernelFactory.CreateKernelAsync("github");
+            var kernel = await _kernelFactory.CreateKernelAsync("ollama");
             
             var templateFactory = new HandlebarsPromptTemplateFactory();
             var templateConfig = new PromptTemplateConfig(invalidTemplate)

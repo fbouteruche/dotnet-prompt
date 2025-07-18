@@ -71,14 +71,23 @@ public static class TestServiceCollectionBuilder
             ["AI:DefaultProvider"] = "ollama",
             ["AI:DefaultModel"] = "test-model",
             
-            // Ollama provider configuration (local testing)
-            ["AI:Ollama:BaseUrl"] = "http://localhost:11434",
-            ["AI:Ollama:Model"] = "test-model",
+            // Local provider configuration (ollama uses local provider in KernelFactory)
+            ["AI:Local:Endpoint"] = "http://localhost:11434",
+            ["AI:Local:Model"] = "test-model",
+            
+            // OpenAI provider configuration (for tests that require model specification)
+            ["AI:OpenAI:ApiKey"] = "test-api-key",
+            ["AI:OpenAI:Model"] = "gpt-4o",
             
             // GitHub provider (for integration scenarios requiring real provider)
             ["AI:GitHub:Token"] = "integration-test-token",
             ["AI:GitHub:Model"] = "gpt-4o",
             ["AI:GitHub:BaseUrl"] = "https://models.inference.ai.azure.com",
+            
+            // Azure provider configuration
+            ["AI:Azure:ApiKey"] = "test-azure-key",
+            ["AI:Azure:Endpoint"] = "https://test.openai.azure.com",
+            ["AI:Azure:Model"] = "gpt-4",
             
             // Logging configuration for integration tests
             ["Logging:LogLevel:Default"] = "Information",
@@ -100,6 +109,7 @@ public static class TestServiceCollectionBuilder
         services.AddSingleton<ILogger<KernelFactory>>(new MockLogger<KernelFactory>());
         services.AddSingleton<ILogger<FileSystemPlugin>>(new MockLogger<FileSystemPlugin>());
         services.AddSingleton<ILogger<ProjectAnalysisPlugin>>(new MockLogger<ProjectAnalysisPlugin>());
+        services.AddSingleton<ILogger<SubWorkflowPlugin>>(new MockLogger<SubWorkflowPlugin>());
     }
 }
 
