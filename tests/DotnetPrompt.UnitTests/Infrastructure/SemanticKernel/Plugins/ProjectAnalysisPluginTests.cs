@@ -1,6 +1,6 @@
-using DotnetPrompt.Infrastructure.Analysis;
-using DotnetPrompt.Infrastructure.Analysis.Compilation;
-using DotnetPrompt.Infrastructure.Analysis.Models;
+using DotnetPrompt.Core.Interfaces;
+using DotnetPrompt.Core.Models.RoslynAnalysis;
+using DotnetPrompt.Core.Models.Enums;
 using DotnetPrompt.Infrastructure.SemanticKernel.Plugins;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -37,30 +37,31 @@ public class ProjectAnalysisPluginTests
         
         try
         {
-            var expectedJson = """
+        var expectedResult = new RoslynAnalysisResult
+        {
+            Success = true,
+            ProjectPath = "/test/project.csproj", 
+            AnalysisTimestamp = "2024-01-01T00:00:00.000Z",
+            ProjectMetadata = new ProjectMetadata
             {
-              "success": true,
-              "projectPath": "/test/project.csproj",
-              "analysisTimestamp": "2024-01-01T00:00:00.000Z",
-              "metadata": {
-                "projectName": "TestProject",
-                "projectType": "Library"
-              }
+                Name = "TestProject",
+                ProjectType = "Library"
             }
-            """;
+        };
 
-            _mockRoslynService
-                .Setup(x => x.AnalyzeAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<AnalysisOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(expectedJson);
-
+        _mockRoslynService
+            .Setup(x => x.AnalyzeAsync(
+                It.IsAny<string>(),
+                It.IsAny<AnalysisOptions>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult(expectedResult));
+            
             // Act
             var result = await _plugin.AnalyzeProjectAsync(projectPath);
 
-            // Assert
-            result.Should().Be(expectedJson);
+            // Assert - Plugin should serialize the result to JSON
+            result.Should().NotBeNullOrEmpty();
+            result.Should().Contain("TestProject");
             
             _mockRoslynService.Verify(
                 x => x.AnalyzeAsync(
@@ -92,11 +93,11 @@ public class ProjectAnalysisPluginTests
         
         try
         {
-            var expectedJson = """{"success": true}""";
+            var expectedResult = new RoslynAnalysisResult { Success = true };
 
             _mockRoslynService
                 .Setup(x => x.AnalyzeAsync(It.IsAny<string>(), It.IsAny<AnalysisOptions>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(expectedJson);
+                .Returns(Task.FromResult(expectedResult));
 
             // Act
             await _plugin.AnalyzeProjectAsync(
@@ -193,9 +194,11 @@ public class ProjectAnalysisPluginTests
             
             try
             {
+                var expectedResult = new RoslynAnalysisResult { Success = true };
+
                 _mockRoslynService
                     .Setup(x => x.AnalyzeAsync(It.IsAny<string>(), It.IsAny<AnalysisOptions>(), It.IsAny<CancellationToken>()))
-                    .ReturnsAsync("{}");
+                    .Returns(Task.FromResult(expectedResult));
 
                 // Act
                 await _plugin.AnalyzeProjectAsync(projectPath, analysis_depth: testCase.Key);

@@ -1,5 +1,7 @@
-using DotnetPrompt.Infrastructure.Analysis.Models;
+using DotnetPrompt.Core.Models.RoslynAnalysis;
+using DotnetPrompt.Core.Models.Enums;
 using DotnetPrompt.Infrastructure.SemanticKernel;
+using DotnetPrompt.Infrastructure.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -60,14 +62,14 @@ public class MSBuildDiagnosticsHandlerTests
     }
 
     [Fact]
-    public void ShouldFallbackToCustom_WithNullCompilation_ReturnsTrue()
+    public void ShouldFallbackToCustom_WithNullCompilationContext_ReturnsTrue()
     {
         // Arrange
         var diagnostics = Enumerable.Empty<WorkspaceDiagnostic>();
-        var result = new CompilationResult(null, CompilationStrategy.MSBuild);
+        RoslynCompilationContext? compilationContext = null;
 
         // Act
-        var shouldFallback = _handler.ShouldFallbackToCustom(diagnostics, result);
+        var shouldFallback = _handler.ShouldFallbackToCustom(diagnostics, compilationContext);
 
         // Assert
         Assert.True(shouldFallback);
