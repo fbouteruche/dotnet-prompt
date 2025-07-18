@@ -1,6 +1,7 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Infrastructure.Models;
 using DotnetPrompt.Infrastructure.SemanticKernel;
+using DotnetPrompt.UnitTests.Utilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,46 +12,31 @@ using Xunit;
 
 namespace DotnetPrompt.UnitTests.Infrastructure.SemanticKernel;
 
-public class KernelFactoryTests
+public class KernelFactoryTests : IDisposable
 {
-    private readonly Mock<IServiceProvider> _mockServiceProvider;
+    private readonly IServiceProvider _serviceProvider;
     private readonly Mock<IConfiguration> _mockConfiguration;
-    private readonly Mock<ILogger<KernelFactory>> _mockLogger;
-    private readonly Mock<IConfigurationService> _mockConfigurationService;
-    private readonly Mock<IFunctionInvocationFilter> _mockFilter;
     private readonly KernelFactory _factory;
 
     public KernelFactoryTests()
     {
-        _mockServiceProvider = new Mock<IServiceProvider>();
+        // Use standardized test service builder
+        var services = TestServiceCollectionBuilder.CreateSemanticKernelTestServices();
+        _serviceProvider = services.BuildServiceProvider();
+
         _mockConfiguration = new Mock<IConfiguration>();
-        _mockLogger = new Mock<ILogger<KernelFactory>>();
-        _mockConfigurationService = new Mock<IConfigurationService>();
-        _mockFilter = new Mock<IFunctionInvocationFilter>();
+        
+        // Get factory from service provider or create manually if needed
+        _factory = _serviceProvider.GetRequiredService<IKernelFactory>() as KernelFactory
+            ?? new KernelFactory(
+                _serviceProvider,
+                _mockConfiguration.Object,
+                _serviceProvider.GetRequiredService<ILogger<KernelFactory>>());
+    }
 
-        // Mock for ConfigurationService used by kernel builder
-        _mockServiceProvider.Setup(x => x.GetService(typeof(IConfigurationService)))
-            .Returns(_mockConfigurationService.Object);
-        _mockServiceProvider.Setup(x => x.GetService(typeof(IFunctionInvocationFilter)))
-            .Returns(_mockFilter.Object);
-
-        // Mock plugins with default loggers
-        var mockFileOps = new DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin(
-            Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin>>(),
-            Options.Create(new FileSystemOptions()));
-        var mockProjectAnalysis = new DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin(
-            Mock.Of<ILogger<DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin>>(),
-            Mock.Of<IRoslynAnalysisService>());
-
-        _mockServiceProvider.Setup(x => x.GetService(typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.FileSystemPlugin)))
-            .Returns(mockFileOps);
-        _mockServiceProvider.Setup(x => x.GetService(typeof(DotnetPrompt.Infrastructure.SemanticKernel.Plugins.ProjectAnalysisPlugin)))
-            .Returns(mockProjectAnalysis);
-
-        _factory = new KernelFactory(
-            _mockServiceProvider.Object,
-            _mockConfiguration.Object,
-            _mockLogger.Object);
+    public void Dispose()
+    {
+        (_serviceProvider as IDisposable)?.Dispose();
     }
 
     [Fact]
