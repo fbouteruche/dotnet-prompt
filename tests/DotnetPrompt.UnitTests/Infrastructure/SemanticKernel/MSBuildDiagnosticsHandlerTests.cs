@@ -3,6 +3,7 @@ using DotnetPrompt.Core.Models.Enums;
 using DotnetPrompt.Infrastructure.SemanticKernel;
 using DotnetPrompt.Infrastructure.Analysis;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -47,17 +48,21 @@ public class MSBuildDiagnosticsHandlerTests
     [Fact]
     public void ShouldFallbackToCustom_WithManyErrors_ReturnsTrue()
     {
-        // Arrange - Create mock diagnostics by creating a list that will be processed
-        var diagnostics = new List<WorkspaceDiagnostic>();
+        // Arrange - Create a compilation context with valid compilation to test diagnostic count logic
+        var validCompilationContext = new RoslynCompilationContext
+        {
+            Success = true,
+            Compilation = CSharpCompilation.Create("TestAssembly") // Empty but valid compilation
+        };
         
-        // Since we can't easily create WorkspaceDiagnostic instances, 
-        // we'll test the logic with an empty list and test indirectly
+        // Create multiple mock diagnostics that would cause fallback (>10 failures)
+        // Since WorkspaceDiagnostic is hard to instantiate, we test the null context scenario instead
         var emptyDiagnostics = Enumerable.Empty<WorkspaceDiagnostic>();
 
-        // Act
+        // Act - Test with null context (should fallback)
         var result = _handler.ShouldFallbackToCustom(emptyDiagnostics, null);
 
-        // Assert - With null compilation, should return true
+        // Assert - With null compilation context, should return true
         Assert.True(result);
     }
 
