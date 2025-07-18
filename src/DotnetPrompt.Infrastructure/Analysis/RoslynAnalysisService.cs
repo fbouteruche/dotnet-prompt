@@ -1,5 +1,7 @@
 using DotnetPrompt.Core.Interfaces;
 using DotnetPrompt.Core.Models.RoslynAnalysis;
+using DotnetPrompt.Core.Models.Enums;
+using DotnetPrompt.Infrastructure.Analysis.Compilation;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.Json;
@@ -88,7 +90,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         CancellationToken cancellationToken)
     {
         // Extract project metadata
-        result.Metadata = await ExtractProjectMetadata(projectPath, cancellationToken);
+        result.ProjectMetadata = await ExtractProjectMetadata(projectPath, cancellationToken);
 
         // Analyze project structure
         result.Structure = await AnalyzeProjectStructure(projectPath, cancellationToken);
@@ -175,10 +177,9 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             {
                 var content = await File.ReadAllTextAsync(projectPath, cancellationToken);
                 
-                metadata.ProjectName = Path.GetFileNameWithoutExtension(projectPath);
+                metadata.Name = Path.GetFileNameWithoutExtension(projectPath);
                 metadata.ProjectType = DetermineProjectType(content);
-                metadata.SdkStyle = content.Contains("<Project Sdk=");
-                metadata.OutputType = ExtractOutputType(content) ?? "Library";
+                // Note: SdkStyle and OutputType properties have been removed from ProjectMetadata
                 
                 var targetFramework = ExtractTargetFramework(content);
                 if (!string.IsNullOrEmpty(targetFramework))
@@ -194,33 +195,11 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             }
             else if (Directory.Exists(projectPath))
             {
-                metadata.ProjectName = Path.GetFileName(projectPath.TrimEnd(Path.DirectorySeparatorChar));
+                metadata.Name = Path.GetFileName(projectPath.TrimEnd(Path.DirectorySeparatorChar));
                 metadata.ProjectType = "Directory";
             }
             
-            // Count files
-            var directory = File.Exists(projectPath) ? Path.GetDirectoryName(projectPath)! : projectPath;
-            if (Directory.Exists(directory))
-            {
-                var sourceFiles = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories);
-                metadata.FileCount = sourceFiles.Length;
-                
-                // Count lines (basic estimate)
-                int totalLines = 0;
-                foreach (var file in sourceFiles.Take(100)) // Limit for performance
-                {
-                    try
-                    {
-                        var lines = await File.ReadAllLinesAsync(file, cancellationToken);
-                        totalLines += lines.Length;
-                    }
-                    catch
-                    {
-                        // Ignore file read errors
-                    }
-                }
-                metadata.LineCount = totalLines;
-            }
+            // Note: File and line counting logic has been moved to ProjectStructure population
         }
         catch (Exception ex)
         {
@@ -248,7 +227,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
                     if (!IsIgnoredDirectory(dirName))
                     {
                         var fileCount = Directory.GetFiles(subdir, "*.cs", SearchOption.AllDirectories).Length;
-                        structure.Directories.Add(new Models.DirectoryInfo { Path = dirName, FileCount = fileCount });
+                        structure.Directories.Add(new DirectoryStructureInfo { Name = dirName, RelativePath = dirName, FileCount = fileCount });
                     }
                 }
                 
@@ -264,9 +243,10 @@ public class RoslynAnalysisService : IRoslynAnalysisService
                         
                         structure.SourceFiles.Add(new SourceFileInfo 
                         { 
-                            Path = relativePath, 
-                            Lines = lines.Length, 
-                            Type = fileType 
+                            Name = Path.GetFileName(file),
+                            RelativePath = relativePath, 
+                            LineCount = lines.Length,
+                            SizeBytes = new FileInfo(file).Length
                         });
                     }
                     catch
@@ -302,7 +282,8 @@ public class RoslynAnalysisService : IRoslynAnalysisService
                 var projectReferences = ExtractProjectReferences(content);
                 dependencies.ProjectReferences.AddRange(projectReferences);
                 
-                dependencies.DependencyCount.Direct = packageReferences.Count + projectReferences.Count;
+                dependencies.DependencyCounts.DirectPackages = packageReferences.Count;
+                dependencies.DependencyCounts.ProjectReferences = projectReferences.Count;
                 // Note: Transitive dependencies would require more complex analysis
             }
         }
@@ -319,11 +300,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         AnalysisOptions options,
         CancellationToken cancellationToken)
     {
-        var analysis = new SemanticAnalysis
-        {
-            DepthUsed = options.SemanticDepth,
-            CompilationRequired = true
-        };
+        var analysis = new SemanticAnalysis();
         
         try
         {
@@ -342,7 +319,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
                 await Task.CompletedTask; // Placeholder for async compliance
             }
             
-            analysis.TypeCount = typeCount;
+            analysis.TypeCounts = typeCount;
             analysis.Namespaces = namespaces;
         }
         catch (Exception ex)
@@ -371,7 +348,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             foreach (var syntaxTree in compilation.SyntaxTrees)
             {
                 var text = await syntaxTree.GetTextAsync(cancellationToken);
-                size.TotalLines += text.Lines.Count;
+                size.LinesOfCode += text.Lines.Count;
             }
             
             metrics.Complexity = complexity;
@@ -398,12 +375,9 @@ public class RoslynAnalysisService : IRoslynAnalysisService
     {
         return new CompilationInfo
         {
-            Success = compilation.Success,
-            StrategyUsed = compilation.StrategyUsed,
-            FallbackUsed = compilation.FallbackUsed,
-            FallbackReason = compilation.FallbackReason,
-            CompilationTimeMs = compilation.CompilationTimeMs,
-            DiagnosticCount = new DiagnosticCount
+            CompilationSuccessful = compilation.Success,
+            AssemblyName = compilation.AssemblyName ?? "Unknown",
+            DiagnosticCounts = new DiagnosticCount
             {
                 Errors = compilation.Diagnostics.ErrorCount,
                 Warnings = compilation.Diagnostics.WarningCount,
@@ -417,24 +391,24 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         var recommendations = new List<Recommendation>();
         
         // Basic recommendations based on analysis results
-        if (result.Compilation?.DiagnosticCount.Errors > 0)
+        if (result.Compilation?.DiagnosticCounts.Errors > 0)
         {
             recommendations.Add(new Recommendation
             {
-                Type = "Compilation",
+                Category = "Compilation",
                 Priority = "High",
-                Message = $"Project has {result.Compilation.DiagnosticCount.Errors} compilation errors that should be addressed",
+                Message = $"Project has {result.Compilation.DiagnosticCounts.Errors} compilation errors that should be addressed",
                 Actionable = true
             });
         }
         
-        if (result.Compilation?.DiagnosticCount.Warnings > 10)
+        if (result.Compilation?.DiagnosticCounts.Warnings > 10)
         {
             recommendations.Add(new Recommendation
             {
-                Type = "Quality",
+                Category = "Quality",
                 Priority = "Medium",
-                Message = $"Project has {result.Compilation.DiagnosticCount.Warnings} warnings - consider addressing them",
+                Message = $"Project has {result.Compilation.DiagnosticCounts.Warnings} warnings - consider addressing them",
                 Actionable = true
             });
         }
